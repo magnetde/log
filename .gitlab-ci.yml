@@ -1,0 +1,10 @@
+image: golang:1.15
+
+stages:
+  - test
+  - build
+
+compile:
+  stage: build
+  script:
+    - go build
