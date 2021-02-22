@@ -1,4 +1,4 @@
-module github.com/magnetde/golog
+module github.com/magnetde/log
 
 go 1.15
 
