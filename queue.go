@@ -5,10 +5,10 @@ import (
 	"sync"
 )
 
-// queue ist eine Datenstruktur, die Jobs in einer Goroutine asynchron ausführt.
+// queue is a data structure that executes jobs asynchronously in a goroutine.
 //
-// Die Queue ist nicht Thread-sicher. Wenn die Queue in verschiedenen Goroutinen ausgeführt werden soll,
-// müssen geeignete Maßnahmen noch hinzugefügt werden.
+// The operations of the queue (pushJob, stopQueue, ...) are not thread-safe.
+// If the queue is to be executed in different goroutines, suitable measures must still be added.
 type queue struct {
 	Handler          func(interface{})
 	ConcurrencyLimit int
@@ -23,12 +23,12 @@ type queue struct {
 	wg               sync.WaitGroup
 }
 
-// Handler ist die Funktion, die einzelne Jobs ausführt.
-// Dabei ist der Parameter das Objekt, dass zur Queue hinzugefügt wurde.
+// Handler is the function that executes individual jobs.
+// The parameter of the handler function is the object that is added to the queue.
 type handler func(interface{})
 
-// NewQueue erstellt eine neue Queue. Als Parameter wird dabei die Handler-Funktion
-// und die maximale Anzahl von parallelen Jobs benötigt.
+// NewQueue creates a new queue.
+// As parameter the handler function and the maximum number of parallel jobs needed.
 func newQueue(handler handler, concurrencyLimit int) *queue {
 	q := &queue{
 		Handler:          handler,
@@ -44,24 +44,24 @@ func newQueue(handler handler, concurrencyLimit int) *queue {
 	return q
 }
 
-// pushJob fügt einen neuen Job zu der Queue hinzu.
+// pushJob adds a new job to the queue.
 func (q *queue) pushJob(val interface{}) {
 	q.push <- val
 }
 
-// stopQueue stoppt die Queue. Anschließend können keine neuen Job aufgenommen.
-// Jobs, die noch auf der Queue existieren werden dabei noch im Hintergrund abgearbeitet.
+// stopQueue stops the queue. After that no new job can be added.
+// Jobs that still exist on the queue are still processed in the background.
 func (q *queue) stopQueue() {
 	q.stop <- struct{}{}
 	runtime.SetFinalizer(q, nil)
 }
 
-// wait wartet solange, bis keine Jobs mehr in der Queue vorhanden sind.
+// wait waits until there are no more jobs in the queue.
 func (q *queue) wait() {
 	q.wg.Wait()
 }
 
-// len gibt die Anzahl der Jobs in der Queue zurück.
+// len returns the number of jobs in the queue.
 func (q *queue) len() (_, _ int) {
 	return q.count, len(q.buffer)
 }

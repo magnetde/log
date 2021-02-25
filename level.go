@@ -2,7 +2,7 @@ package log
 
 import "github.com/fatih/color"
 
-// Level ist das interne Log-Level.
+// Level is the internal log level.
 type Level string
 
 const (
@@ -14,7 +14,13 @@ const (
 	levelFatal Level = "fatal"
 )
 
-func (l Level) int() int {
+// GreaterEquals compares whether the current level is greater than or equal to the given minimum level.
+func (l Level) GreaterEquals(min Level) bool {
+	return l.num() >= min.num()
+}
+
+// num returns the severity of the level.
+func (l Level) num() int {
 	switch l {
 	case levelTrace:
 		return 1
@@ -33,6 +39,7 @@ func (l Level) int() int {
 	}
 }
 
+// color colors the givewn text in the color assigned to the level.
 func (l Level) color(str string) string {
 	switch l {
 	case levelTrace:
