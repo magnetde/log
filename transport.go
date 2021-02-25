@@ -12,19 +12,17 @@ import (
 	"github.com/fatih/color"
 )
 
-// Transporter ist das Interface, das alle Funktionen für einen einzelnen Log-Transporter enthält.
+// Transporter is the interface that contains all the functions for a single log transporter.
 type Transporter interface {
-	minLevel() int
-
-	transport(level Level, msg string, date time.Time)
-	close()
+	Transport(level Level, msg string, date time.Time)
+	Close()
 }
 
-// ConsoleTransporter ist der Transporter, der in die Konsole loggt.
-// Hierbei existieren folgende Attribute:
-//  Date: Datum soll mit ausgegeben werden
-//  Colors: Eintrag soll farbig ausgegeben werden
-//  MinLevel: nur Eintrage ab diesem Level sollen ausgegeben werden
+// ConsoleTransporter is the transporter that logs to the console.
+// The following attributes exist:
+//  Date: the date should be included in the output
+//  Colors: output should be colored
+//  MinLevel: only entries with a log level greater than or equal to this level should be printed
 type ConsoleTransporter struct {
 	Date     bool
 	Colors   bool
@@ -33,11 +31,12 @@ type ConsoleTransporter struct {
 	lastMessage int64
 }
 
-func (t *ConsoleTransporter) minLevel() int {
-	return Level(t.MinLevel).int()
-}
+// Transport prints the log entry.
+func (t *ConsoleTransporter) Transport(level Level, msg string, date time.Time) {
+	if !level.GreaterEquals(Level(t.MinLevel)) {
+		return
+	}
 
-func (t *ConsoleTransporter) transport(level Level, msg string, date time.Time) {
 	const prefixLength = 5 + 2
 
 	prefix := padStart("["+string(level)+"]", prefixLength, " ")
@@ -83,14 +82,15 @@ func (t *ConsoleTransporter) transport(level Level, msg string, date time.Time) 
 	os.Stdout.Write(result.Bytes())
 }
 
-func (t *ConsoleTransporter) close() {}
+// Close does nothing. Its only purpose is to match the Transporter interface.
+func (t *ConsoleTransporter) Close() {}
 
-// ServerTransporter ist der Transporter, der an den Log-Server loggt.
-// Hierbei existieren folgende Attribute:
-//  Type: Typ, des Log-Clients. Nach gruppiert der Log-Server Log-Einträge.
-//  URL: URL des Log-Servers
-//  Secret: geheimer Token für den Log-Server
-//  MinLevel: nur Eintrage ab diesem Level sollen ausgegeben werden
+// ServerTransporter is the transporter that logs to the log server.
+// The following attributes exists:
+//  Type: type of the log client. The log server groups log entries according to this param
+//  URL: URL of the log server
+//  Secret: secret token for the log server
+//  MinLevel: only entries from this level should be sent
 type ServerTransporter struct {
 	Type   string
 	URL    string
@@ -114,11 +114,12 @@ type logError struct {
 	Err string `json:"error"`
 }
 
-func (t *ServerTransporter) minLevel() int {
-	return Level(t.MinLevel).int()
-}
+// Transport send the log entry to the server.
+func (t *ServerTransporter) Transport(level Level, msg string, date time.Time) {
+	if !level.GreaterEquals(Level(t.MinLevel)) {
+		return
+	}
 
-func (t *ServerTransporter) transport(level Level, msg string, date time.Time) {
 	if t.queue == nil {
 		t.runQueue()
 	}
@@ -199,14 +200,17 @@ func (t *ServerTransporter) showError(err error) {
 		}
 
 		date := time.Now()
-		log.transport(levelError, "Failed to send log to server: "+err.Error(), date)
+		log.Transport(levelError, "Failed to send log to server: "+err.Error(), date)
 
 		t.lastErrorShown = now()
 	}
 }
 
-func (t *ServerTransporter) close() {
+// Close waits until the log entries have been sent to the server and then deletes the queue.
+func (t *ServerTransporter) Close() {
 	if t.queue != nil {
+		t.queue.stopQueue()
 		t.queue.wait()
+		t.queue = nil
 	}
 }

@@ -2,13 +2,14 @@ package log
 
 import "strings"
 
+// divCeil calculates ceil(x / y)
 func divCeil(x int, y int) int {
 	return (x + y - 1) / y
 }
 
-// PadStart konkateniert den aktuellen String mit einem weiteren String auf (bei Bedarf mehrfach),
-// bis der resultierende String die angegebene Länge erreicht.
-// Das Auffüllen wird ab dem Anfang der aktuellen Zeichenkette angewendet.
+// padStart pads the current string with another string (multiple times if needed)
+// until the resulting string reaches the specified length.
+// Padding is applied from the beginning of the current string.
 func padStart(s string, l int, fill string) string {
 	stringLength := len(s)
 
