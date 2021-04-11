@@ -19,10 +19,10 @@ func init() {
 	mutex = new(sync.Mutex)
 }
 
-// Init initialisiert den Logger, indem verschiedene Transporter zu dem Logger hinzugefügt werden.
-// Hierbei kann neben dem Transporter in die Konsole auch an einem Server geloggt werden.
+// Init initializes the logger by adding the given transporters to the logger.
+// In addition to the console transporter, logging can also be send to a server.
 //
-// Dieser Aufruf ist optional. Wenn diese Funktion nicht aufgerufen wird, wird nur in die Konsole geloggt.
+// This call is optional. If this function is not called, it will only be logged to the console.
 func Init(t ...Transporter) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -34,19 +34,19 @@ func Init(t ...Transporter) {
 	}
 }
 
-// Close schließt alle Transporter.
-// Wenn an einen Server geloggt wird, wird gewartet, bis alle Log-Einträge erfolgreich an den Server gesendet wurden.
+// Close closes all transporters.
+// When logging is sent to a server, the function waits until all log entries have been successfully sent to the server.
 func Close() {
 	mutex.Lock()
 	defer mutex.Unlock()
 
 	for _, transport := range transports {
-		transport.close()
+		transport.Close()
 	}
 	transports = []Transporter{}
 }
 
-func logInternal(level Level, a ...interface{}) {
+func logInternal(level Level, a []interface{}) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -65,40 +65,36 @@ func logInternal(level Level, a ...interface{}) {
 	msg := buff.String()
 
 	for _, t := range transports {
-		if level.int() < t.minLevel() {
-			return
-		}
-
-		t.transport(level, msg, date)
+		t.Transport(level, msg, date)
 	}
 }
 
-// Trace erstellt einen Log-Eintrag mit dem Level "trace"
+// Trace creates a log entry with the "trace" level
 func Trace(a ...interface{}) {
-	logInternal(levelTrace, a...)
+	logInternal(levelTrace, a)
 }
 
-// Debug erstellt einen Log-Eintrag mit dem Level "debug"
+// Debug creates a log entry with the "debug" level
 func Debug(a ...interface{}) {
-	logInternal(levelDebug, a...)
+	logInternal(levelDebug, a)
 }
 
-// Info erstellt einen Log-Eintrag mit dem Level "Info"
+// Info creates a log entry with the "info" level
 func Info(a ...interface{}) {
-	logInternal(levelInfo, a...)
+	logInternal(levelInfo, a)
 }
 
-// Warn erstellt einen Log-Eintrag mit dem Level "warn"
+// Warn creates a log entry with the "warn" level
 func Warn(a ...interface{}) {
-	logInternal(levelWarn, a...)
+	logInternal(levelWarn, a)
 }
 
-// Error erstellt einen Log-Eintrag mit dem Level "error"
+// Error creates a log entry with the "error" level
 func Error(a ...interface{}) {
-	logInternal(levelError, a...)
+	logInternal(levelError, a)
 }
 
-// Fatal erstellt einen Log-Eintrag mit dem Level "fatal"
+// Fatal creates a log entry with the "fatal" level
 func Fatal(a ...interface{}) {
-	logInternal(levelFatal, a...)
+	logInternal(levelFatal, a)
 }
