@@ -11,15 +11,10 @@ func now() int64 {
 }
 
 func formatDate(t time.Time) string {
-	format := t.UTC().Local().Format(time.RFC3339)
-	format = strings.Replace(format, "T", "", 1)
-	parts := strings.Split(format, "Z")
+	layout := strings.Replace(time.RFC3339, "T", " ", 1)
+	layout = strings.Split(layout, "Z")[0]
 
-	if len(parts) == 0 {
-		return ""
-	}
-
-	return parts[0]
+	return t.UTC().Local().Format(layout)
 }
 
 func formatDiff(time int64) string {
