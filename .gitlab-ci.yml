@@ -6,8 +6,16 @@ stages:
 
 test:
   stage: test
+  before_script:
+    - go get github.com/t-yuki/gocover-cobertura
+    - find / -name gocover-cobertura
+    - echo $PATH
   script:
-    - go test -cover
+    - go test -cover -coverprofile=coverage.txt
+    - gocover-cobertura < coverage.txt > cobertura-coverage.xml
+  artifacts:
+    reports:
+      cobertura: cobertura-coverage.xml
 
 compile:
   stage: build
