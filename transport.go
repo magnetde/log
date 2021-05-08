@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -27,6 +28,7 @@ type ConsoleTransporter struct {
 	Date     bool
 	Colors   bool
 	MinLevel string
+	Output   io.Writer
 
 	lastMessage int64
 }
@@ -79,7 +81,12 @@ func (t *ConsoleTransporter) Transport(level Level, msg string, date time.Time) 
 	result.WriteRune('\n')
 
 	t.lastMessage = now()
-	os.Stdout.Write(result.Bytes())
+
+	if t.Output == nil {
+		t.Output = os.Stdout
+	}
+
+	t.Output.Write(result.Bytes())
 }
 
 // Close does nothing. Its only purpose is to match the Transporter interface.
