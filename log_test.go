@@ -44,5 +44,5 @@ func TestConsole(t *testing.T) {
 		}
 	}
 
-	Close()
+	// Close()
 }

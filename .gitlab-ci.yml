@@ -17,7 +17,5 @@ test:
     - go test -cover -coverprofile=coverage.txt
     - gocover-cobertura < coverage.txt > cobertura-coverage.xml
   artifacts:
-    name: ${CI_JOB_NAME}-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
-    expire_in: 2 days
     reports:
       cobertura: cobertura-coverage.xml
