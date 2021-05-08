@@ -4,6 +4,11 @@ stages:
   - test
   - build
 
+test:
+  stage: test
+  script:
+    - go test -cover
+
 compile:
   stage: build
   script:
