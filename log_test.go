@@ -219,17 +219,17 @@ func TestColor(t *testing.T) {
 
 		switch level {
 		case "trace":
-			prefix = append(prefix, []byte("34m")...)
+			prefix = append(prefix, []byte("34m")...) // blue
 		case "debug":
-			prefix = append(prefix, []byte("36m")...)
+			prefix = append(prefix, []byte("36m")...) // cyan
 		case "info":
-			prefix = append(prefix, []byte("32m")...)
+			prefix = append(prefix, []byte("32m")...) // green
 		case "warn":
-			prefix = append(prefix, []byte("33m")...)
+			prefix = append(prefix, []byte("33m")...) // yellow
 		case "error":
-			prefix = append(prefix, []byte("31m")...)
+			prefix = append(prefix, []byte("31m")...) // red
 		case "fatal":
-			prefix = append(prefix, []byte("31;1m")...)
+			prefix = append(prefix, []byte("31;1m")...) // red + bold
 		default:
 			t.Errorf("Unknown log level %s", level)
 			continue

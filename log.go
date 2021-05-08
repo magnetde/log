@@ -27,11 +27,7 @@ func Init(t ...Transporter) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	transports = nil
-
-	for _, transport := range t {
-		transports = append(transports, transport)
-	}
+	transports = t
 }
 
 // Close closes all transporters.
