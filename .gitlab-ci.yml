@@ -1,8 +1,13 @@
 image: golang:1.15
 
 stages:
-  - test
   - build
+  - test
+
+compile:
+  stage: build
+  script:
+    - go build
 
 test:
   stage: test
@@ -16,8 +21,3 @@ test:
   artifacts:
     reports:
       cobertura: cobertura-coverage.xml
-
-compile:
-  stage: build
-  script:
-    - go build
