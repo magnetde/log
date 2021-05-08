@@ -241,3 +241,50 @@ func TestColor(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkLog(b *testing.B) {
+	runBenchmark(b, false, false)
+}
+
+func BenchmarkLogColors(b *testing.B) {
+	runBenchmark(b, true, false)
+}
+
+func BenchmarkLogDate(b *testing.B) {
+	runBenchmark(b, false, true)
+}
+
+func BenchmarkLogColorsDate(b *testing.B) {
+	runBenchmark(b, true, true)
+}
+
+func runBenchmark(b *testing.B, colors bool, date bool) {
+	var buf bytes.Buffer
+
+	Init(&ConsoleTransporter{
+		Colors: colors,
+		Date:   date,
+		Output: &buf,
+	})
+
+	for i := 0; i < b.N; i++ {
+		switch i % 6 {
+		case 0:
+			Trace("test")
+		case 1:
+			Debug("test")
+		case 2:
+			Info("test")
+		case 3:
+			Warn("test")
+		case 4:
+			Error("test")
+		case 5:
+			Fatal("test")
+		}
+
+		if buf.Len() > 1_000_000 {
+			buf.Reset()
+		}
+	}
+}
