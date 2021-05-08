@@ -54,7 +54,6 @@ func TestBasic(t *testing.T) {
 	var buf bytes.Buffer
 
 	Init(&ConsoleTransporter{
-		Colors: false,
 		Output: &buf,
 	})
 
@@ -96,7 +95,6 @@ func TestDate(t *testing.T) {
 	var buf bytes.Buffer
 
 	Init(&ConsoleTransporter{
-		Colors: false,
 		Date:   true,
 		Output: &buf,
 	})
@@ -124,5 +122,33 @@ func TestDate(t *testing.T) {
 
 	if diff >= 1*time.Minute {
 		t.Fatalf("The log entry was created more than a minute ago")
+	}
+}
+
+func TestMinLevel(t *testing.T) {
+	var buf bytes.Buffer
+
+	Init(&ConsoleTransporter{
+		MinLevel: "warn",
+		Output:   &buf,
+	})
+
+	Trace("test")
+	Debug("test")
+	Info("test")
+	Warn("test")
+	Error("test")
+	Fatal("test")
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+
+	for _, l := range lines {
+		line := strings.TrimSpace(l)
+
+		parsed := parseLog(line)
+
+		if parsed.level == "trace" || parsed.level == "debug" || parsed.level == "info" {
+			t.Errorf("Log entry with level %s found", parsed.level)
+		}
 	}
 }
