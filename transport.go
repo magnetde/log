@@ -49,7 +49,6 @@ func (t *ConsoleTransporter) Transport(level Level, msg string, date time.Time) 
 
 	var result bytes.Buffer
 	result.WriteString(prefix)
-	result.WriteRune(' ')
 
 	if t.Date {
 		dateStr := formatDate(date)
@@ -58,23 +57,25 @@ func (t *ConsoleTransporter) Transport(level Level, msg string, date time.Time) 
 			dateStr = color.WhiteString(dateStr)
 		}
 
-		result.WriteRune('[')
+		result.WriteString(" [")
 		result.WriteString(dateStr)
-		result.WriteString("] ")
+		result.WriteString("]")
 	}
 
-	result.WriteString(msg)
+	if len(msg) > 0 {
+		result.WriteRune(' ')
+		result.WriteString(msg)
+	}
 
 	if t.lastMessage != 0 {
 		diff := now() - t.lastMessage
 		timeDiff := formatDiff(diff)
 
-		result.WriteRune(' ')
-
 		if t.Colors {
 			timeDiff = color.WhiteString(timeDiff)
 		}
 
+		result.WriteRune(' ')
 		result.WriteString(timeDiff)
 	}
 

@@ -2,15 +2,53 @@ package log
 
 import (
 	"bytes"
-	"fmt"
 	"regexp"
 	"strings"
 	"testing"
 )
 
-var logRegex = regexp.MustCompile(" ?[(.+)] ([(.+)])? .+")
+const regexLevel = "trace|debug|info|warn|error|fatal"
+const regexDate = "[0-9]+-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"
 
-func TestConsole(t *testing.T) {
+var regexLog = regexp.MustCompile(`^\[(` + regexLevel + `)\]( \[(` + regexDate + `)\])? ?(.*)$`)
+var regexTime = regexp.MustCompile(` (0|0\.[0-9][0-9][0-9]? ms|[0-9]+ (ms|s|m|h))$`)
+
+type ParsedLog struct {
+	level    string
+	date     string
+	message  string
+	timediff string
+}
+
+func parseLog(line string) *ParsedLog {
+	line = strings.TrimSpace(line)
+
+	groups := regexLog.FindStringSubmatch(line)
+
+	parsed := &ParsedLog{
+		level: groups[1],
+		date:  groups[3],
+	}
+
+	timeGroups := regexTime.FindStringSubmatch(groups[4])
+
+	if len(timeGroups) > 0 {
+		timediff := timeGroups[1]
+
+		parsed.message = strings.TrimSuffix(groups[4], " "+timediff)
+		parsed.timediff = timediff
+	} else {
+		parsed.message = groups[4]
+	}
+
+	return parsed
+}
+
+func TestDefault(t *testing.T) {
+	Info("test")
+}
+
+func TestBasic(t *testing.T) {
 	var buf bytes.Buffer
 
 	Init(&ConsoleTransporter{
@@ -36,13 +74,18 @@ func TestConsole(t *testing.T) {
 	for i, l := range lines {
 		line := strings.TrimSpace(l)
 
+		parsed := parseLog(line)
 		e := expected[i]
-		prefix := fmt.Sprintf("[%s] test %s", e, e)
 
-		if !strings.HasPrefix(line, prefix) {
-			t.Errorf("Expected prefix \"%s\" for line \"%s\"", prefix, line)
+		if parsed.level != e {
+			t.Errorf("Expected level \"%s\", got \"%s\"", e, parsed.level)
+		}
+
+		if parsed.message != "test "+e {
+			t.Errorf("Expected message \"test %s\", got \"%s\"", e, parsed.message)
 		}
 	}
 
-	// Close()
+	// Only for coverage
+	Close()
 }
