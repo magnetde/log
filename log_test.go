@@ -25,6 +25,9 @@ func parseLog(line string) *ParsedLog {
 	line = strings.TrimSpace(line)
 
 	groups := regexLog.FindStringSubmatch(line)
+	if len(groups) == 0 {
+		return nil
+	}
 
 	parsed := &ParsedLog{
 		level: groups[1],
@@ -47,10 +50,10 @@ func parseLog(line string) *ParsedLog {
 
 // Testing with default transport: console transport with output = nil
 func TestDefault(t *testing.T) {
-	Info("test")
+	Info()
 }
 
-func TestBasic(t *testing.T) {
+func TestLevels(t *testing.T) {
 	var buf bytes.Buffer
 
 	Init(&ConsoleTransporter{
@@ -76,6 +79,11 @@ func TestBasic(t *testing.T) {
 		line := strings.TrimSpace(l)
 
 		parsed := parseLog(line)
+		if parsed == nil {
+			t.Errorf("Filed to parse log entry \"%s\"", line)
+			continue
+		}
+
 		e := expected[i]
 
 		if parsed.level != e {
@@ -104,6 +112,9 @@ func TestDate(t *testing.T) {
 	msg := strings.TrimSpace(buf.String())
 
 	parsed := parseLog(msg)
+	if parsed == nil {
+		t.Fatalf("Filed to parse log entry \"%s\"", msg)
+	}
 
 	layout := strings.Replace(time.RFC3339, "T", " ", 1)
 	layout = strings.Split(layout, "Z")[0]
@@ -146,9 +157,87 @@ func TestMinLevel(t *testing.T) {
 		line := strings.TrimSpace(l)
 
 		parsed := parseLog(line)
+		if parsed == nil {
+			t.Errorf("Filed to parse log entry \"%s\"", line)
+			continue
+		}
 
 		if parsed.level == "trace" || parsed.level == "debug" || parsed.level == "info" {
 			t.Errorf("Log entry with level %s found", parsed.level)
+		}
+	}
+}
+
+func TestConcat(t *testing.T) {
+	var buf bytes.Buffer
+
+	Init(&ConsoleTransporter{
+		Output: &buf,
+	})
+
+	Info("abc", 1, -1, 0.5, true, nil)
+
+	msg := buf.String()
+	parsed := parseLog(msg)
+	if parsed == nil {
+		t.Errorf("Filed to parse log entry \"%s\"", msg)
+	} else if parsed.message != "abc 1 -1 0.5 true <nil>" {
+		t.Errorf("Concating and converting values to string does not work")
+	}
+}
+
+func TestColor(t *testing.T) {
+	var buf bytes.Buffer
+
+	Init(&ConsoleTransporter{
+		Colors: true,
+		Date:   true,
+		Output: &buf,
+	})
+
+	Trace("test")
+	Debug("test")
+	Info("test")
+	Warn("test")
+	Error("test")
+	Fatal("test")
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+
+	regexLevel := regexp.MustCompile(`\[([a-z]+)\]`)
+
+	for i, line := range lines {
+		levels := regexLevel.FindStringSubmatch(line)
+		if len(levels) == 0 {
+			t.Errorf("Failed to find the level at the colored log entry at entry %d", i)
+			continue
+		}
+
+		level := levels[1]
+
+		prefix := []byte{27, '['} // Prefix ^[
+
+		switch level {
+		case "trace":
+			prefix = append(prefix, []byte("34m")...)
+		case "debug":
+			prefix = append(prefix, []byte("36m")...)
+		case "info":
+			prefix = append(prefix, []byte("32m")...)
+		case "warn":
+			prefix = append(prefix, []byte("33m")...)
+		case "error":
+			prefix = append(prefix, []byte("31m")...)
+		case "fatal":
+			prefix = append(prefix, []byte("31;1m")...)
+		default:
+			t.Errorf("Unknown log level %s", level)
+			continue
+		}
+
+		if !bytes.HasPrefix([]byte(line), prefix) {
+			t.Errorf("Wrong color at log level %s", level)
+			continue
 		}
 	}
 }
