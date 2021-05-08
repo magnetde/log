@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 const regexLevel = "trace|debug|info|warn|error|fatal"
@@ -44,6 +45,7 @@ func parseLog(line string) *ParsedLog {
 	return parsed
 }
 
+// Testing with default transport: console transport with output = nil
 func TestDefault(t *testing.T) {
 	Info("test")
 }
@@ -67,7 +69,7 @@ func TestBasic(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
 
 	if len(lines) != len(expected) {
-		t.Errorf("Expected %d log entries, got %d\n", len(lines), len(expected))
+		t.Fatalf("Expected %d log entries, got %d\n", len(lines), len(expected))
 		return
 	}
 
@@ -88,4 +90,39 @@ func TestBasic(t *testing.T) {
 
 	// Only for coverage
 	Close()
+}
+
+func TestDate(t *testing.T) {
+	var buf bytes.Buffer
+
+	Init(&ConsoleTransporter{
+		Colors: false,
+		Date:   true,
+		Output: &buf,
+	})
+
+	Info("test date")
+
+	msg := strings.TrimSpace(buf.String())
+
+	parsed := parseLog(msg)
+
+	layout := strings.Replace(time.RFC3339, "T", " ", 1)
+	layout = strings.Split(layout, "Z")[0]
+
+	logTime, err := time.Parse(layout, parsed.date)
+	if err != nil {
+		t.Fatalf("Failed to parse log date: %s", err.Error())
+	}
+
+	now, _ := time.Parse(layout, formatDate(time.Now()))
+	diff := now.Sub(logTime)
+
+	if diff < 0 {
+		t.Fatalf("The log time is in the future: %d", diff)
+	}
+
+	if diff >= 1*time.Minute {
+		t.Fatalf("The log entry was created more than a minute ago")
+	}
 }
