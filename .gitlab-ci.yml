@@ -12,9 +12,9 @@ compile:
 test:
   stage: test
   before_script:
-    - go get github.com/t-yuki/gocover-cobertura
+    - go get github.com/boumenot/gocover-cobertura
   script:
-    - go test -cover -coverprofile=coverage.txt
+    - go test -cover -coverprofile=coverage.txt -covermode count
     - gocover-cobertura < coverage.txt > cobertura-coverage.xml
   artifacts:
     reports:
