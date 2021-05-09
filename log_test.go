@@ -186,6 +186,42 @@ func TestConcat(t *testing.T) {
 	}
 }
 
+func TestTimeDiff(t *testing.T) {
+	var buf bytes.Buffer
+
+	Init(&ConsoleTransporter{
+		Output: &buf,
+	})
+
+	Info("test")
+	Info("test")
+	time.Sleep(5 * time.Second)
+	Info("test")
+	Info("test")
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	expected := []string{"", "0", "5 s", "0"}
+
+	if len(lines) != len(expected) {
+		t.Fatalf("Expected %d log entries, got %d\n", len(lines), len(expected))
+		return
+	}
+
+	for i, l := range lines {
+		line := strings.TrimSpace(l)
+
+		parsed := parseLog(line)
+		if parsed == nil {
+			t.Errorf("Filed to parse log entry \"%s\"", line)
+			continue
+		}
+
+		if parsed.timediff != expected[i] {
+			t.Errorf("Ecpected time diff \"%s\", got \"%s\"", expected[i], parsed.timediff)
+		}
+	}
+}
+
 func TestColor(t *testing.T) {
 	var buf bytes.Buffer
 
