@@ -194,13 +194,14 @@ func TestTimeDiff(t *testing.T) {
 	})
 
 	Info("test")
+	time.Sleep(123 * time.Millisecond)
 	Info("test")
-	time.Sleep(5 * time.Second)
+	time.Sleep(3 * time.Second)
 	Info("test")
 	Info("test")
 
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
-	expected := []string{"", "0", "5 s", "0"}
+	expected := []string{"", "123 ms", "3 s", "0"}
 
 	if len(lines) != len(expected) {
 		t.Fatalf("Expected %d log entries, got %d\n", len(lines), len(expected))

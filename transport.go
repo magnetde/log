@@ -158,9 +158,18 @@ func (t *ServerTransporter) runQueue() {
 		}
 
 		jsonData, err := json.Marshal(entry)
+		if err != nil {
+			t.showError(err)
+			return
+		}
+
 		buff := bytes.NewBuffer(jsonData)
 
 		req, err := http.NewRequest(http.MethodPost, t.URL, buff)
+		if err != nil {
+			t.showError(err)
+			return
+		}
 
 		req.Header.Set("accept", "application/json")
 		req.Header.Set("Content-Type", "application/json")
