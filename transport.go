@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -27,6 +28,7 @@ type ConsoleTransporter struct {
 	Date     bool
 	Colors   bool
 	MinLevel string
+	Output   io.Writer
 
 	lastMessage int64
 }
@@ -47,7 +49,6 @@ func (t *ConsoleTransporter) Transport(level Level, msg string, date time.Time) 
 
 	var result bytes.Buffer
 	result.WriteString(prefix)
-	result.WriteRune(' ')
 
 	if t.Date {
 		dateStr := formatDate(date)
@@ -56,30 +57,37 @@ func (t *ConsoleTransporter) Transport(level Level, msg string, date time.Time) 
 			dateStr = color.WhiteString(dateStr)
 		}
 
-		result.WriteRune('[')
+		result.WriteString(" [")
 		result.WriteString(dateStr)
-		result.WriteString("] ")
+		result.WriteString("]")
 	}
 
-	result.WriteString(msg)
+	if len(msg) > 0 {
+		result.WriteRune(' ')
+		result.WriteString(msg)
+	}
 
 	if t.lastMessage != 0 {
 		diff := now() - t.lastMessage
 		timeDiff := formatDiff(diff)
 
-		result.WriteRune(' ')
-
 		if t.Colors {
 			timeDiff = color.WhiteString(timeDiff)
 		}
 
+		result.WriteRune(' ')
 		result.WriteString(timeDiff)
 	}
 
 	result.WriteRune('\n')
 
 	t.lastMessage = now()
-	os.Stdout.Write(result.Bytes())
+
+	if t.Output == nil {
+		t.Output = os.Stdout
+	}
+
+	t.Output.Write(result.Bytes())
 }
 
 // Close does nothing. Its only purpose is to match the Transporter interface.
@@ -150,9 +158,18 @@ func (t *ServerTransporter) runQueue() {
 		}
 
 		jsonData, err := json.Marshal(entry)
+		if err != nil {
+			t.showError(err)
+			return
+		}
+
 		buff := bytes.NewBuffer(jsonData)
 
 		req, err := http.NewRequest(http.MethodPost, t.URL, buff)
+		if err != nil {
+			t.showError(err)
+			return
+		}
 
 		req.Header.Set("accept", "application/json")
 		req.Header.Set("Content-Type", "application/json")

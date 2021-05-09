@@ -14,6 +14,10 @@ const (
 	levelFatal Level = "fatal"
 )
 
+func init() {
+	color.NoColor = false
+}
+
 // GreaterEquals compares whether the current level is greater than or equal to the given minimum level.
 func (l Level) GreaterEquals(min Level) bool {
 	return l.num() >= min.num()
