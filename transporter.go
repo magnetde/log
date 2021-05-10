@@ -16,6 +16,17 @@ import (
 // Transporter is the interface that contains all the functions for a single log transporter.
 type Transporter interface {
 	Transport(level Level, msg string, date time.Time)
+}
+
+// initTransporter is the transporter with an init function.
+type initTransporter interface {
+	Transporter
+	Init() error
+}
+
+// closeTransporter is the transporter with an close function.
+type closeTransporter interface {
+	Transporter
 	Close()
 }
 
