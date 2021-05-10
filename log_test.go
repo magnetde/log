@@ -12,7 +12,7 @@ const regexLevel = "trace|debug|info|warn|error|fatal"
 const regexDate = "[0-9]+-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"
 
 var regexLog = regexp.MustCompile(`^\[(` + regexLevel + `)\]( \[(` + regexDate + `)\])? ?(.*)$`)
-var regexTime = regexp.MustCompile(` (0|0\.[0-9][0-9][0-9]? ms|[0-9]+ (ms|s|m|h))$`)
+var regexTime = regexp.MustCompile(` (0|0\.[0-9]{1,3} ms|[0-9]+ (ms|s|m|h))$`)
 
 type ParsedLog struct {
 	level    string
@@ -80,7 +80,7 @@ func TestLevels(t *testing.T) {
 
 		parsed := parseLog(line)
 		if parsed == nil {
-			t.Errorf("Filed to parse log entry \"%s\"", line)
+			t.Errorf("Failed to parse log entry \"%s\"", line)
 			continue
 		}
 
@@ -113,7 +113,7 @@ func TestDate(t *testing.T) {
 
 	parsed := parseLog(msg)
 	if parsed == nil {
-		t.Fatalf("Filed to parse log entry \"%s\"", msg)
+		t.Fatalf("Failed to parse log entry \"%s\"", msg)
 	}
 
 	layout := strings.Replace(time.RFC3339, "T", " ", 1)
@@ -158,7 +158,7 @@ func TestMinLevel(t *testing.T) {
 
 		parsed := parseLog(line)
 		if parsed == nil {
-			t.Errorf("Filed to parse log entry \"%s\"", line)
+			t.Errorf("Failed to parse log entry \"%s\"", line)
 			continue
 		}
 
@@ -180,7 +180,7 @@ func TestConcat(t *testing.T) {
 	msg := buf.String()
 	parsed := parseLog(msg)
 	if parsed == nil {
-		t.Errorf("Filed to parse log entry \"%s\"", msg)
+		t.Errorf("Failed to parse log entry \"%s\"", msg)
 	} else if parsed.message != "abc 1 -1 0.5 true <nil>" {
 		t.Errorf("Concating and converting values to string does not work")
 	}
@@ -201,7 +201,7 @@ func TestTimeDiff(t *testing.T) {
 	Info("test")
 
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
-	expected := []string{"", "123 ms", "3 s", "0"}
+	expected := []string{"^$", `^12[3-6] ms$`, "^3 s$", `^0(.0[1-4] ms)?$`}
 
 	if len(lines) != len(expected) {
 		t.Fatalf("Expected %d log entries, got %d\n", len(lines), len(expected))
@@ -213,12 +213,15 @@ func TestTimeDiff(t *testing.T) {
 
 		parsed := parseLog(line)
 		if parsed == nil {
-			t.Errorf("Filed to parse log entry \"%s\"", line)
+			t.Errorf("Failed to parse log entry \"%s\"", line)
 			continue
 		}
 
-		if parsed.timediff != expected[i] {
-			t.Errorf("Ecpected time diff \"%s\", got \"%s\"", expected[i], parsed.timediff)
+		e := expected[i]
+		expreg := regexp.MustCompile(e)
+
+		if !expreg.MatchString(parsed.timediff) {
+			t.Errorf("Expected time diff to match \"%s\", got \"%s\"", e, parsed.timediff)
 		}
 	}
 }

@@ -19,41 +19,30 @@ type Transporter interface {
 	Close()
 }
 
-// ConsoleTransporter is the transporter that logs to the console.
-// The following attributes exist:
-//  Date: the date should be included in the output
-//  Colors: output should be colored
-//  MinLevel: only entries with a log level greater than or equal to this level should be printed
-type ConsoleTransporter struct {
-	Date     bool
-	Colors   bool
-	MinLevel string
-	Output   io.Writer
+type stringTransporter interface {
+	withDate() bool
+	withColors() bool
 
-	lastMessage int64
+	lastMessage() int64
+	setLastMessage(l int64)
 }
 
-// Transport prints the log entry.
-func (t *ConsoleTransporter) Transport(level Level, msg string, date time.Time) {
-	if !level.GreaterEquals(Level(t.MinLevel)) {
-		return
-	}
-
+func logToString(t stringTransporter, level Level, msg string, date time.Time) string {
 	const prefixLength = 5 + 2
 
 	prefix := padStart("["+string(level)+"]", prefixLength, " ")
 
-	if t.Colors {
+	if t.withColors() {
 		prefix = level.color(prefix)
 	}
 
 	var result bytes.Buffer
 	result.WriteString(prefix)
 
-	if t.Date {
+	if t.withDate() {
 		dateStr := formatDate(date)
 
-		if t.Colors {
+		if t.withColors() {
 			dateStr = color.WhiteString(dateStr)
 		}
 
@@ -67,11 +56,11 @@ func (t *ConsoleTransporter) Transport(level Level, msg string, date time.Time) 
 		result.WriteString(msg)
 	}
 
-	if t.lastMessage != 0 {
-		diff := now() - t.lastMessage
+	if t.lastMessage() != 0 {
+		diff := now() - t.lastMessage()
 		timeDiff := formatDiff(diff)
 
-		if t.Colors {
+		if t.withColors() {
 			timeDiff = color.WhiteString(timeDiff)
 		}
 
@@ -81,13 +70,52 @@ func (t *ConsoleTransporter) Transport(level Level, msg string, date time.Time) 
 
 	result.WriteRune('\n')
 
-	t.lastMessage = now()
+	t.setLastMessage(now())
+	return result.String()
+}
+
+// ConsoleTransporter is the transporter that logs to the console.
+// The following attributes exist:
+//  Date: the date should be included in the output
+//  Colors: output should be colored
+//  MinLevel: only entries with a log level greater than or equal to this level should be printed
+type ConsoleTransporter struct {
+	Date     bool
+	Colors   bool
+	MinLevel string
+	Output   io.Writer
+
+	lastMsg int64
+}
+
+func (t *ConsoleTransporter) withDate() bool {
+	return t.Date
+}
+
+func (t *ConsoleTransporter) withColors() bool {
+	return t.Colors
+}
+
+func (t *ConsoleTransporter) lastMessage() int64 {
+	return t.lastMsg
+}
+
+func (t *ConsoleTransporter) setLastMessage(l int64) {
+	t.lastMsg = l
+}
+
+// Transport prints the log entry.
+func (t *ConsoleTransporter) Transport(level Level, msg string, date time.Time) {
+	if !level.GreaterEquals(Level(t.MinLevel)) {
+		return
+	}
 
 	if t.Output == nil {
 		t.Output = os.Stdout
 	}
 
-	t.Output.Write(result.Bytes())
+	result := logToString(t, level, msg, date)
+	t.Output.Write([]byte(result))
 }
 
 // Close does nothing. Its only purpose is to match the Transporter interface.
