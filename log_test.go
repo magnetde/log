@@ -73,7 +73,7 @@ func TestLevels(t *testing.T) {
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
 
 	if len(lines) != len(expected) {
-		t.Fatalf("Expected %d log entries, got %d\n", len(lines), len(expected))
+		t.Fatalf("Expected %d log entries, got %d\n", len(expected), len(lines))
 		return
 	}
 
@@ -206,7 +206,7 @@ func TestTimeDiff(t *testing.T) {
 	expected := []string{"^$", `^12[3-6] ms$`, "^3 s$", `^0(.0[1-4] ms)?$`}
 
 	if len(lines) != len(expected) {
-		t.Fatalf("Expected %d log entries, got %d\n", len(lines), len(expected))
+		t.Fatalf("Expected %d log entries, got %d\n", len(expected), len(lines))
 		return
 	}
 
@@ -310,7 +310,7 @@ func TestFile(t *testing.T) {
 	expected := []string{"debug", "info", "error"}
 
 	if len(lines) != len(expected) {
-		t.Fatalf("Expected %d log entries, got %d\n", len(lines), len(expected))
+		t.Fatalf("Expected %d log entries, got %d\n", len(expected), len(lines))
 		return
 	}
 

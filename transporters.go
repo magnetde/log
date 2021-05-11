@@ -1,13 +1,21 @@
 package log
 
+// File with different implementations of transporters.
+
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -62,15 +70,40 @@ type FileTransporter struct {
 	Colors   bool
 	MinLevel string
 
-	file    *os.File
+	RotateBytes int64
+	RotateLines int
+	RotateAge   time.Duration
+
+	file     *os.File
+	fsize    int64
+	flines   int
+	fcreated time.Time
+
 	lastMsg int64
 }
 
 func (t *FileTransporter) Init() error {
 	var err error
-	t.file, err = os.OpenFile(t.Path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	t.file, err = os.OpenFile(t.Path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		return err
+	}
 
-	return err
+	stats, err := t.file.Stat()
+	if err != nil {
+		return err
+	}
+
+	t.fsize = stats.Size()
+
+	t.flines, err = countLines(t.file)
+	if err != nil {
+		return err
+	}
+
+	// TODO t.fcreated = stats.
+
+	return nil
 }
 
 func (t *FileTransporter) withDate() bool {
@@ -96,7 +129,119 @@ func (t *FileTransporter) Transport(level Level, msg string, date time.Time) {
 	}
 
 	result := logToString(t, level, msg, date)
+
 	t.file.WriteString(result)
+	t.fsize += int64(len([]byte(result)))
+	t.flines += 1
+
+	// Check if rotation needed
+	if t.RotateBytes > 0 && t.fsize > t.RotateBytes {
+		t.rotate()
+	} else if t.RotateLines > 0 && t.flines > t.RotateLines {
+		t.rotate()
+	} else if t.RotateAge > 0 {
+		maxtime := t.fcreated.Add(t.RotateAge)
+
+		if time.Now().After(maxtime) {
+			t.rotate()
+		}
+	}
+}
+
+var regexName = regexp.MustCompile(`(.+).(\d+).gz`)
+
+func (t *FileTransporter) rotate() {
+	if t.fsize == 0 || t.flines == 0 {
+		return
+	}
+
+	dir := filepath.Dir(t.Path)
+	prefix := strings.TrimSpace(rawfilename(filepath.Base(t.Path)))
+
+	newArchive := filepath.Join(dir, prefix+".1.gz")
+
+	// Rotate archives while xxx.1.gz exists
+	for {
+		exists, err := fileExists(newArchive)
+		if exists && err == nil {
+			err = t.rotateArchives(dir, prefix)
+			if err != nil {
+				t.showError(err)
+				break
+			}
+		} else if err != nil {
+			t.showError(err)
+			break
+		}
+	}
+
+	// Write bytes in compressed form to the file.
+	gz, err := os.OpenFile(newArchive, os.O_RDONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		t.showError(err)
+		return
+	}
+
+	w := gzip.NewWriter(gz)
+	defer w.Close()
+
+	_, err = io.Copy(w, t.file)
+	if err != nil {
+		t.showError(err)
+		return
+	}
+
+	err = t.file.Truncate(0)
+	if err != nil {
+		t.showError(err)
+		return
+	}
+
+	t.fsize = 0
+	t.flines = 0
+	t.fcreated = time.Now()
+}
+
+func (t *FileTransporter) rotateArchives(dir string, prefix string) error {
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+
+	renames := make(map[string]string)
+
+	for _, file := range files {
+		name := file.Name()
+		groups := regexName.FindStringSubmatch(name)
+		if len(groups) == 0 {
+			continue
+		}
+
+		p := strings.TrimSpace(groups[1])
+		if prefix != p {
+			continue
+		}
+
+		index, err := strconv.Atoi(groups[2])
+		if err != nil {
+			continue
+		}
+
+		newName := fmt.Sprintf("%s.%d.gz", prefix, index+1)
+
+		path := filepath.Join(dir, name)
+		newPath := filepath.Join(dir, newName)
+
+		renames[path] = newPath
+	}
+
+	return renameAll(renames)
+}
+
+func (t *FileTransporter) showError(err error) {
+	log := ConsoleTransporter{Colors: true}
+	date := time.Now()
+	log.Transport(levelError, "Failed to rotate log file: "+err.Error(), date)
 }
 
 // Close closes the log file.
@@ -207,10 +352,7 @@ func (t *ServerTransporter) runQueue() {
 
 func (t *ServerTransporter) showError(err error) {
 	if t.lastErrorShown+10*int64(time.Minute) < now() {
-		log := ConsoleTransporter{
-			Colors: true,
-		}
-
+		log := ConsoleTransporter{Colors: true}
 		date := time.Now()
 		log.Transport(levelError, "Failed to send log to server: "+err.Error(), date)
 
