@@ -2,7 +2,7 @@ package log
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -59,8 +59,93 @@ func rawfilename(name string) string {
 	return name[:len(name)-len(filepath.Ext(name))]
 }
 
-func renameAll(renames map[string]string) error {
-	return errors.New("not implemented")
+// Renames all files with the least overhead.
+// See https://stackoverflow.com/questions/43775524/rename-all-contents-of-directory-with-a-minimum-of-overhead
+func renameAll(D map[string]string) error {
+	moved := make(map[string]bool)     // set
+	filenames := make(map[string]bool) // set
+	tmp := getTempfile(filepath.Join(os.TempDir(), "rename"))
+
+	rename := func(start, dest string) error {
+		moved[start] = true
+		return os.Rename(start, dest)
+	}
+
+	for start := range D {
+		if _, ok := moved[start]; ok {
+			continue
+		}
+
+		A := []string{} // List of files to rename
+		p := start
+
+		for {
+			A = append(A, p)
+			dest := D[p]
+			if _, ok := filenames[dest]; !ok {
+				break
+			}
+
+			if dest == start {
+				// Found a loop
+				D[tmp] = D[start]
+
+				err := rename(start, tmp)
+				if err != nil {
+					return err
+				}
+
+				A[0] = tmp
+				break
+			}
+
+			p = dest
+		}
+
+		A = reverse(A)
+		for _, f := range A {
+			err := rename(f, D[f])
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func getTempfile(p string) string {
+	p = filepath.Clean(p)
+
+	max := int(1 << 20)
+
+	for i := 0; true; i++ {
+		var path string
+		if i == 0 {
+			path = p
+		} else {
+			path = fmt.Sprintf("%s-%d", p, i)
+		}
+
+		if exists, err := fileExists(path); !exists && err == nil {
+			return path
+		} else if err != nil {
+			max >>= 1
+		}
+	}
+
+	return p + "-tmp"
+}
+
+func reverse(s []string) []string {
+	a := make([]string, len(s))
+	copy(a, s)
+
+	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		s[i], s[j] = s[j], s[i]
+	}
+
+	return s
 }
 
 // fileExists checks if the file exists. If an error occurs when checking, it is returned.

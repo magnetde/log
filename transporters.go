@@ -1,6 +1,9 @@
 package log
 
 // File with different implementations of transporters.
+// - ConsoleTransporter: log to console or another writer
+// - FileTransporter: write logs to file and rotate log files
+// - ServerTransporter: send logs to logcollect server
 
 import (
 	"bytes"
