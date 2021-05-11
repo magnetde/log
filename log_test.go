@@ -74,7 +74,6 @@ func TestLevels(t *testing.T) {
 
 	if len(lines) != len(expected) {
 		t.Fatalf("Expected %d log entries, got %d\n", len(expected), len(lines))
-		return
 	}
 
 	for i, l := range lines {
@@ -207,7 +206,6 @@ func TestTimeDiff(t *testing.T) {
 
 	if len(lines) != len(expected) {
 		t.Fatalf("Expected %d log entries, got %d\n", len(expected), len(lines))
-		return
 	}
 
 	for i, l := range lines {
@@ -311,7 +309,6 @@ func TestFile(t *testing.T) {
 
 	if len(lines) != len(expected) {
 		t.Fatalf("Expected %d log entries, got %d\n", len(expected), len(lines))
-		return
 	}
 
 	for i, l := range lines {
@@ -326,6 +323,56 @@ func TestFile(t *testing.T) {
 		if parsed.level != expected[i] || parsed.message != "test" {
 			t.Errorf("Log entry \"%s\" does not match", line)
 			continue
+		}
+	}
+}
+
+func TestRotate(t *testing.T) {
+	dir := t.TempDir()
+	dir = "/config/logx"
+	path := filepath.Join(dir, "test.log")
+
+	tp := &FileTransporter{
+		Path:        path,
+		Date:        true,
+		RotateLines: 4,
+		Rotations:   4,
+	}
+
+	Init(tp)
+	defer Close()
+
+	for i := 0; i < 19; i++ {
+		Info("test", i+1)
+
+		if i%5 == 0 { // Close to count number of lines at Init()
+			Close()
+			Init(tp)
+		}
+	}
+
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("Failed to read dir: %s", err.Error())
+	}
+
+	expected := map[string]bool{
+		"test.log":      true,
+		"test.log.1.gz": true,
+		"test.log.2.gz": true,
+		"test.log.3.gz": true,
+	}
+
+	if len(files) != len(expected) {
+		t.Fatalf("Expected %d log files, got %d\n", len(expected), len(files))
+	}
+
+	for _, f := range files {
+		name := f.Name()
+
+		_, ok := expected[name]
+		if !ok {
+			t.Fatalf("Found unexpected log file \"%s\"\n", name)
 		}
 	}
 }

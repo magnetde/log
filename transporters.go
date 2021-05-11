@@ -75,12 +75,11 @@ type FileTransporter struct {
 
 	RotateBytes int64
 	RotateLines int
-	RotateAge   time.Duration
+	Rotations   int
 
-	file     *os.File
-	fsize    int64
-	flines   int
-	fcreated time.Time
+	file   *os.File
+	fsize  int64
+	flines int
 
 	lastMsg int64
 }
@@ -138,16 +137,10 @@ func (t *FileTransporter) Transport(level Level, msg string, date time.Time) {
 	t.flines += 1
 
 	// Check if rotation needed
-	if t.RotateBytes > 0 && t.fsize > t.RotateBytes {
+	if t.RotateBytes > 0 && t.fsize >= t.RotateBytes {
 		t.rotate()
-	} else if t.RotateLines > 0 && t.flines > t.RotateLines {
+	} else if t.RotateLines > 0 && t.flines >= t.RotateLines {
 		t.rotate()
-	} else if t.RotateAge > 0 {
-		maxtime := t.fcreated.Add(t.RotateAge)
-
-		if time.Now().After(maxtime) {
-			t.rotate()
-		}
 	}
 }
 
@@ -159,27 +152,31 @@ func (t *FileTransporter) rotate() {
 	}
 
 	dir := filepath.Dir(t.Path)
-	prefix := strings.TrimSpace(rawfilename(filepath.Base(t.Path)))
+	prefix := strings.TrimSpace(filepath.Base(t.Path))
 
 	newArchive := filepath.Join(dir, prefix+".1.gz")
 
 	// Rotate archives while xxx.1.gz exists
 	for {
 		exists, err := fileExists(newArchive)
+
 		if exists && err == nil {
 			err = t.rotateArchives(dir, prefix)
 			if err != nil {
 				t.showError(err)
 				break
 			}
-		} else if err != nil {
-			t.showError(err)
+		} else {
+			if err != nil {
+				t.showError(err)
+			}
+
 			break
 		}
 	}
 
 	// Write bytes in compressed form to the file.
-	gz, err := os.OpenFile(newArchive, os.O_RDONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	gz, err := os.OpenFile(newArchive, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		t.showError(err)
 		return
@@ -188,6 +185,7 @@ func (t *FileTransporter) rotate() {
 	w := gzip.NewWriter(gz)
 	defer w.Close()
 
+	t.file.Seek(0, io.SeekStart)
 	_, err = io.Copy(w, t.file)
 	if err != nil {
 		t.showError(err)
@@ -202,7 +200,6 @@ func (t *FileTransporter) rotate() {
 
 	t.fsize = 0
 	t.flines = 0
-	t.fcreated = time.Now()
 }
 
 func (t *FileTransporter) rotateArchives(dir string, prefix string) error {
@@ -215,6 +212,8 @@ func (t *FileTransporter) rotateArchives(dir string, prefix string) error {
 
 	for _, file := range files {
 		name := file.Name()
+		path := filepath.Join(dir, name)
+
 		groups := regexName.FindStringSubmatch(name)
 		if len(groups) == 0 {
 			continue
@@ -230,9 +229,12 @@ func (t *FileTransporter) rotateArchives(dir string, prefix string) error {
 			continue
 		}
 
-		newName := fmt.Sprintf("%s.%d.gz", prefix, index+1)
+		if t.Rotations > 0 && index+1 >= t.Rotations { // Rotate
+			os.Remove(path)
+			continue
+		}
 
-		path := filepath.Join(dir, name)
+		newName := fmt.Sprintf("%s.%d.gz", prefix, index+1)
 		newPath := filepath.Join(dir, newName)
 
 		renames[path] = newPath
