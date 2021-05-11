@@ -329,7 +329,6 @@ func TestFile(t *testing.T) {
 
 func TestRotate(t *testing.T) {
 	dir := t.TempDir()
-	dir = "/config/logx"
 	path := filepath.Join(dir, "test.log")
 
 	tp := &FileTransporter{
