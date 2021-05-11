@@ -68,7 +68,7 @@ type FileTransporter struct {
 
 func (t *FileTransporter) Init() error {
 	var err error
-	t.file, err = os.Open(t.Path)
+	t.file, err = os.OpenFile(t.Path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 
 	return err
 }

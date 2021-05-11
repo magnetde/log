@@ -2,6 +2,8 @@ package log
 
 import (
 	"bytes"
+	"io/ioutil"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -277,6 +279,52 @@ func TestColor(t *testing.T) {
 
 		if !bytes.HasPrefix([]byte(line), prefix) {
 			t.Errorf("Wrong color at log level %s", level)
+			continue
+		}
+	}
+}
+
+func TestFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.log")
+
+	tp := &FileTransporter{
+		Path: path,
+		Date: true,
+	}
+
+	Init(tp)
+	Debug("test")
+	Info("test")
+	Close()
+
+	Init(tp)
+	Error("test")
+	Close()
+
+	logs, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(logs)), "\n")
+	expected := []string{"debug", "info", "error"}
+
+	if len(lines) != len(expected) {
+		t.Fatalf("Expected %d log entries, got %d\n", len(lines), len(expected))
+		return
+	}
+
+	for i, l := range lines {
+		line := strings.TrimSpace(l)
+
+		parsed := parseLog(line)
+		if parsed == nil {
+			t.Errorf("Failed to parse log entry \"%s\"", line)
+			continue
+		}
+
+		if parsed.level != expected[i] || parsed.message != "test" {
+			t.Errorf("Log entry \"%s\" does not match", line)
 			continue
 		}
 	}
