@@ -75,7 +75,7 @@ type FileTransporter struct {
 
 	RotateBytes int64
 	RotateLines int
-	RotateAge   time.Duration
+	Rotations   int
 
 	file     *os.File
 	fsize    int64
@@ -142,12 +142,6 @@ func (t *FileTransporter) Transport(level Level, msg string, date time.Time) {
 		t.rotate()
 	} else if t.RotateLines > 0 && t.flines > t.RotateLines {
 		t.rotate()
-	} else if t.RotateAge > 0 {
-		maxtime := t.fcreated.Add(t.RotateAge)
-
-		if time.Now().After(maxtime) {
-			t.rotate()
-		}
 	}
 }
 
@@ -215,6 +209,8 @@ func (t *FileTransporter) rotateArchives(dir string, prefix string) error {
 
 	for _, file := range files {
 		name := file.Name()
+		path := filepath.Join(dir, name)
+
 		groups := regexName.FindStringSubmatch(name)
 		if len(groups) == 0 {
 			continue
@@ -230,9 +226,11 @@ func (t *FileTransporter) rotateArchives(dir string, prefix string) error {
 			continue
 		}
 
-		newName := fmt.Sprintf("%s.%d.gz", prefix, index+1)
+		if index >= t.Rotations {
+			os.Remove(path) // Skip error
+		}
 
-		path := filepath.Join(dir, name)
+		newName := fmt.Sprintf("%s.%d.gz", prefix, index+1)
 		newPath := filepath.Join(dir, newName)
 
 		renames[path] = newPath
