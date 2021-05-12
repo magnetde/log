@@ -20,11 +20,11 @@ func init() {
 
 // GreaterEquals compares whether the current level is greater than or equal to the given minimum level.
 func (l Level) GreaterEquals(min Level) bool {
-	return l.num() >= min.num()
+	return l.Index() >= min.Index()
 }
 
-// num returns the severity of the level.
-func (l Level) num() int {
+// Index returns the severity of the level.
+func (l Level) Index() int {
 	switch l {
 	case levelTrace:
 		return 1
