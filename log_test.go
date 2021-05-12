@@ -59,6 +59,36 @@ func TestDefault(t *testing.T) {
 	Info()
 }
 
+func TestLogger(t *testing.T) {
+	var buf bytes.Buffer
+
+	l, _ := CreateLogger(&ConsoleTransporter{
+		Output: &buf,
+	})
+
+	l.Log("info")
+	l.Close()
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+
+	if len(lines) != 1 {
+		t.Fatalf("Expected 1 log entry, got %d\n", len(lines))
+	}
+
+	parsed := parseLog(lines[0])
+	if parsed == nil {
+		t.Fatalf("Failed to parse log entry \"%s\"", lines[0])
+	}
+
+	if parsed.level != "info" {
+		t.Fatalf("Expected log level \"info\", got \"%s\"", parsed.level)
+	}
+
+	if parsed.message != "" {
+		t.Fatalf("Expected message \"\", got \"%s\"", parsed.message)
+	}
+}
+
 func TestLevels(t *testing.T) {
 	var buf bytes.Buffer
 
@@ -204,7 +234,7 @@ func TestTimeDiff(t *testing.T) {
 	Info("test")
 
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
-	expected := []string{"^$", `^12[3-6] ms$`, "^3 s$", `^0(.0[1-4] ms)?$`}
+	expected := []string{"^$", `^12[3-6] ms$`, "^3 s$", `^0(\.0[1-6] ms)?$`}
 
 	if len(lines) != len(expected) {
 		t.Fatalf("Expected %d log entries, got %d\n", len(expected), len(lines))
