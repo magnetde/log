@@ -14,7 +14,12 @@ The following types of outputs (_transports_) are so far possible:
 
 The log entry is printed to stdout. It is also possible to create a colored output or concat the date to the log entry.
 
-## 2. Log server
+## 2. File
+
+Analogous to the console, log entries can be written to a file.
+Log files can be rotated by compressing the current log file and adding a sequential suffix (e.g. _example.log.1.gz_).
+
+## 3. Log server
 
 JSON packets are sent to an URL via HTTP POST calls. Packets have the following format:
 
@@ -31,10 +36,6 @@ HTTP calls are executed in a separate go routine, so calls to log functions do n
 
 Thereby, the correct order is guaranteed.
 
-## 3. File
-
-The output via file is not supported yet.
-
 ## Example
 
 ```golang
@@ -48,6 +49,12 @@ func main() {
 			Date:   true,
 			Colors: true,
 		},
+		&log.FileTransporter{
+			Path:        "/var/log/test.log",
+			Date:        true,
+			RotateLines: 50_000, // Rotate after 50,000 lines
+			Rotations:   12,     // Keep 12 rotations
+		},
 		&log.ServerTransporter{
 			Type:     "example",
 			URL:      "http://localhost/log",
@@ -58,6 +65,7 @@ func main() {
 
 	log.Info("Example info")
 	log.Error("Example error")
+	log.Close()
 }
 ```
 
