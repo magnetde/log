@@ -81,7 +81,14 @@ type FileTransporter struct {
 	fsize  int64
 	flines int
 
+	queue   *queue
 	lastMsg int64
+}
+
+type fileLogEntry struct {
+	level   Level
+	message string
+	date    time.Time
 }
 
 func (t *FileTransporter) Init() error {
@@ -103,45 +110,32 @@ func (t *FileTransporter) Init() error {
 		return err
 	}
 
-	// TODO t.fcreated = stats.
-
+	t.runQueue()
 	return nil
 }
 
-func (t *FileTransporter) withDate() bool {
-	return t.Date
-}
+func (t *FileTransporter) runQueue() {
+	q := newQueue(func(v interface{}) {
+		e, ok := v.(fileLogEntry)
+		if !ok {
+			return
+		}
 
-func (t *FileTransporter) withColors() bool {
-	return t.Colors
-}
+		result := logToString(t, e.level, e.message, e.date)
 
-func (t *FileTransporter) lastMessage() int64 {
-	return t.lastMsg
-}
+		t.file.WriteString(result)
+		t.fsize += int64(len([]byte(result)))
+		t.flines += 1
 
-func (t *FileTransporter) setLastMessage(l int64) {
-	t.lastMsg = l
-}
+		// Check if rotation needed
+		if t.RotateBytes > 0 && t.fsize >= t.RotateBytes {
+			t.rotate()
+		} else if t.RotateLines > 0 && t.flines >= t.RotateLines {
+			t.rotate()
+		}
+	}, 1, 1024)
 
-// Transport writes the log entry to the file.
-func (t *FileTransporter) Transport(level Level, msg string, date time.Time) {
-	if !level.GreaterEquals(Level(t.MinLevel)) {
-		return
-	}
-
-	result := logToString(t, level, msg, date)
-
-	t.file.WriteString(result)
-	t.fsize += int64(len([]byte(result)))
-	t.flines += 1
-
-	// Check if rotation needed
-	if t.RotateBytes > 0 && t.fsize >= t.RotateBytes {
-		t.rotate()
-	} else if t.RotateLines > 0 && t.flines >= t.RotateLines {
-		t.rotate()
-	}
+	t.queue = q
 }
 
 var regexName = regexp.MustCompile(`(.+).(\d+).gz`)
@@ -249,8 +243,40 @@ func (t *FileTransporter) showError(err error) {
 	log.Transport(levelError, "Failed to rotate log file: "+err.Error(), date)
 }
 
+func (t *FileTransporter) withDate() bool {
+	return t.Date
+}
+
+func (t *FileTransporter) withColors() bool {
+	return t.Colors
+}
+
+func (t *FileTransporter) lastMessage() int64 {
+	return t.lastMsg
+}
+
+func (t *FileTransporter) setLastMessage(l int64) {
+	t.lastMsg = l
+}
+
+// Transport writes the log entry to the file.
+func (t *FileTransporter) Transport(level Level, msg string, date time.Time) {
+	if !level.GreaterEquals(Level(t.MinLevel)) {
+		return
+	}
+
+	e := fileLogEntry{
+		level:   level,
+		message: msg,
+		date:    date,
+	}
+
+	t.queue.addJob(e)
+}
+
 // Close closes the log file.
 func (t *FileTransporter) Close() {
+	t.queue.close()
 	t.file.Close()
 }
 
@@ -271,7 +297,7 @@ type ServerTransporter struct {
 	lastErrorShown int64
 }
 
-type logEntry struct {
+type serverLogEntry struct {
 	Type    string `json:"type"`
 	Level   Level  `json:"level"`
 	Date    string `json:"date"`
@@ -293,7 +319,7 @@ func (t *ServerTransporter) Init() {
 
 func (t *ServerTransporter) runQueue() {
 	q := newQueue(func(v interface{}) {
-		entry, ok := v.(logEntry)
+		entry, ok := v.(serverLogEntry)
 		if !ok {
 			return
 		}
@@ -350,7 +376,7 @@ func (t *ServerTransporter) runQueue() {
 			t.showError(errors.New(logErr.Err))
 			return
 		}
-	}, 1)
+	}, 1, 1024)
 
 	t.queue = q
 }
@@ -371,7 +397,7 @@ func (t *ServerTransporter) Transport(level Level, msg string, date time.Time) {
 		return
 	}
 
-	e := logEntry{
+	e := serverLogEntry{
 		Type:    t.Type,
 		Level:   level,
 		Date:    date.Format(time.RFC3339),
@@ -382,14 +408,10 @@ func (t *ServerTransporter) Transport(level Level, msg string, date time.Time) {
 		e.Secret = t.Secret
 	}
 
-	t.queue.pushJob(e)
+	t.queue.addJob(e)
 }
 
 // Close waits until the log entries have been sent to the server and then deletes the queue.
 func (t *ServerTransporter) Close() {
-	if t.queue != nil {
-		t.queue.stopQueue()
-		t.queue.wait()
-		t.queue = nil
-	}
+	t.queue.close()
 }

@@ -72,6 +72,7 @@ func TestLevels(t *testing.T) {
 	Warn("test warn")
 	Error("test error")
 	Fatal("test fatal")
+	Close() // Only for coverage
 
 	expected := [...]string{"trace", "debug", "info", "warn", "error", "fatal"}
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
@@ -99,9 +100,6 @@ func TestLevels(t *testing.T) {
 			t.Errorf("Expected message \"test %s\", got \"%s\"", e, parsed.message)
 		}
 	}
-
-	// Only for coverage
-	Close()
 }
 
 func TestDate(t *testing.T) {
@@ -343,16 +341,17 @@ func TestRotate(t *testing.T) {
 	}
 
 	Init(tp)
-	defer Close()
 
 	for i := 0; i < 19; i++ {
 		Info(i + 1)
 
-		if i%5 == 0 { // Close to count number of lines at Init()
+		if i > 0 && i%5 == 0 { // Close to count number of lines at Init()
 			Close()
 			Init(tp)
 		}
 	}
+
+	Close()
 
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {

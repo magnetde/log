@@ -1,26 +1,19 @@
 package log
 
 import (
-	"runtime"
 	"sync"
 )
 
 // queue is a data structure that executes jobs asynchronously in a goroutine.
 //
-// The operations of the queue (pushJob, stopQueue, ...) are not thread-safe.
+// The operations of the queue (addJob, close, ...) are not thread-safe.
 // If the queue is to be executed in different goroutines, suitable measures must still be added.
 type queue struct {
-	Handler          func(interface{})
-	ConcurrencyLimit int
-	push             chan interface{}
-	pop              chan struct{}
-	suspend          chan bool
-	suspended        bool
-	stop             chan struct{}
-	stopped          bool
-	buffer           []interface{}
-	count            int
-	wg               sync.WaitGroup
+	jobs    chan interface{}
+	closeq  chan bool
+	workers chan chan bool
+	once    sync.Once
+	handler handler
 }
 
 // Handler is the function that executes individual jobs.
@@ -28,88 +21,74 @@ type queue struct {
 type handler func(interface{})
 
 // NewQueue creates a new queue.
-// As parameter the handler function and the maximum number of parallel jobs needed.
-func newQueue(handler handler, concurrencyLimit int) *queue {
+// As parameter the handler function, the maximum number of parallel jobs and the size is needed.
+func newQueue(handler func(interface{}), workers int, size int) *queue {
 	q := &queue{
-		Handler:          handler,
-		ConcurrencyLimit: concurrencyLimit,
-		push:             make(chan interface{}),
-		pop:              make(chan struct{}),
-		suspend:          make(chan bool),
-		stop:             make(chan struct{}),
+		jobs:    make(chan interface{}, size),
+		closeq:  make(chan bool),
+		workers: make(chan chan bool, workers),
+		handler: handler,
 	}
 
-	go q.run()
-	runtime.SetFinalizer(q, (*queue).stopQueue)
+	for w := 0; w < workers; w++ {
+		q.workers <- q.worker()
+	}
+
+	close(q.workers)
 	return q
 }
 
-// pushJob adds a new job to the queue.
-func (q *queue) pushJob(val interface{}) {
-	q.push <- val
-}
+// worker creates a worker that runs tasks in the background.
+func (q *queue) worker() chan bool {
+	done := make(chan bool)
 
-// stopQueue stops the queue. After that no new job can be added.
-// Jobs that still exist on the queue are still processed in the background.
-func (q *queue) stopQueue() {
-	q.stop <- struct{}{}
-	runtime.SetFinalizer(q, nil)
-}
+	go func() {
+	work:
+		for {
+			select {
+			case <-q.closeq:
+				break work
+			case j := <-q.jobs:
+				q.handler(j)
+			}
+		}
 
-// wait waits until there are no more jobs in the queue.
-func (q *queue) wait() {
-	q.wg.Wait()
-}
-
-// len returns the number of jobs in the queue.
-func (q *queue) len() (_, _ int) {
-	return q.count, len(q.buffer)
-}
-
-func (q *queue) run() {
-	defer func() {
-		q.wg.Add(-len(q.buffer))
-		q.buffer = nil
+		close(done)
 	}()
 
-	for {
+	return done
+}
+
+// close closes the queue. After that no new job can be added.
+// Jobs that still exist on the queue are still processed and the function blocks until all tasks are completed.
+func (q *queue) close() {
+	q.once.Do(func() {
+		close(q.closeq)
+	})
+
+	for w := range q.workers {
+		<-w
+	}
+
+	close(q.jobs)
+	for j := range q.jobs {
+		q.handler(j)
+	}
+}
+
+// addJob adds a new job to the queue.
+func (q *queue) addJob(job interface{}) bool {
+	// Check the queue is open first
+	select {
+	case <-q.closeq:
+		return false
+	default:
+		// While the jobs queue send is blocking, we might shutdown the queue
 		select {
-		case val := <-q.push:
-			q.buffer = append(q.buffer, val)
-			q.wg.Add(1)
-		case <-q.pop:
-			q.count--
-		case suspend := <-q.suspend:
-			if suspend != q.suspended {
-				if suspend {
-					q.wg.Add(1)
-				} else {
-					q.wg.Done()
-				}
-
-				q.suspended = suspend
-			}
-		case <-q.stop:
-			q.stopped = true
-		}
-
-		if q.stopped && q.count == 0 {
-			return
-		}
-
-		for (q.count < q.ConcurrencyLimit || q.ConcurrencyLimit == 0) && len(q.buffer) > 0 && !(q.suspended || q.stopped) {
-			val := q.buffer[0]
-			q.buffer = q.buffer[1:]
-			q.count++
-
-			go func() {
-				defer func() {
-					q.pop <- struct{}{}
-					q.wg.Done()
-				}()
-
-				q.Handler(val)
-			}()
+		case q.jobs <- job:
+			return true
+		case <-q.closeq:
+			return false
 		}
 	}
 }
