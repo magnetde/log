@@ -92,6 +92,10 @@ type fileLogEntry struct {
 }
 
 func (t *FileTransporter) Init() error {
+	if t.MinLevel != "" && Level(t.MinLevel).Index() == 0 {
+		t.MinLevel = ""
+	}
+
 	var err error
 	t.file, err = os.OpenFile(t.Path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
@@ -310,7 +314,7 @@ type logError struct {
 }
 
 func (t *ServerTransporter) Init() {
-	if t.MinLevel != "" && Level(t.MinLevel).num() == 0 {
+	if t.MinLevel != "" && Level(t.MinLevel).Index() == 0 {
 		t.MinLevel = ""
 	}
 
