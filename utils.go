@@ -34,6 +34,7 @@ func padStart(s string, l int, fill string) string {
 }
 
 // countLines counts the number of lines in a file.
+// To count the NewLine character the function bytes.Count() is used, because it is optimized processor specific.
 func countLines(r io.Reader) (int, error) {
 	buf := make([]byte, 32*1024)
 	count := 0
@@ -54,7 +55,6 @@ func countLines(r io.Reader) (int, error) {
 }
 
 // Renames all files with the least overhead.
-// See https://stackoverflow.com/questions/43775524/rename-all-contents-of-directory-with-a-minimum-of-overhead
 func renameAll(fmap map[string]string) error {
 	filenames := make(map[string]bool)
 	for k := range fmap {
@@ -77,8 +77,10 @@ func renameAll(fmap map[string]string) error {
 	return nil
 }
 
+// renameRecursive deletes the respective file.
+// If the destination filename is already in use, it recursively renames the respective destination first.
 func renameRecursive(fmap map[string]string, filenames map[string]bool, file string, depth int) error {
-	if depth > 8192 {
+	if depth > 16*1024 {
 		return errors.New("maximum recursion depth for rotating reached")
 	}
 

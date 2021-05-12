@@ -2,9 +2,13 @@ package log
 
 import (
 	"bytes"
+	"compress/gzip"
+	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -342,7 +346,7 @@ func TestRotate(t *testing.T) {
 	defer Close()
 
 	for i := 0; i < 19; i++ {
-		Info("test", i+1)
+		Info(i + 1)
 
 		if i%5 == 0 { // Close to count number of lines at Init()
 			Close()
@@ -355,11 +359,11 @@ func TestRotate(t *testing.T) {
 		t.Fatalf("Failed to read dir: %s", err.Error())
 	}
 
-	expected := map[string]bool{
-		"test.log":      true,
-		"test.log.1.gz": true,
-		"test.log.2.gz": true,
-		"test.log.3.gz": true,
+	expected := map[string][]int{
+		"test.log":      {17, 18, 19},
+		"test.log.1.gz": {13, 14, 15, 16},
+		"test.log.2.gz": {9, 10, 11, 12},
+		"test.log.3.gz": {5, 6, 7, 8},
 	}
 
 	if len(files) != len(expected) {
@@ -368,12 +372,77 @@ func TestRotate(t *testing.T) {
 
 	for _, f := range files {
 		name := f.Name()
+		path := filepath.Join(dir, name)
 
-		_, ok := expected[name]
+		nums, ok := expected[name]
 		if !ok {
 			t.Fatalf("Found unexpected log file \"%s\"\n", name)
 		}
+
+		err := readLogfile(path, strings.HasSuffix(path, ".gz"), nums)
+		if err != nil {
+			t.Fatalf("%s: %s", name, err.Error())
+		}
 	}
+}
+
+func readLogfile(path string, compressed bool, expected []int) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+
+	defer f.Close()
+
+	var strl string
+	if compressed {
+		w, err := gzip.NewReader(f)
+		if err != nil {
+			return err
+		}
+
+		defer w.Close()
+
+		c, err := ioutil.ReadAll(w)
+		if err != nil {
+			return err
+		}
+
+		strl = string(c)
+	} else {
+		c, err := ioutil.ReadAll(f)
+		if err != nil {
+			return err
+		}
+
+		strl = string(c)
+	}
+
+	lines := strings.Split(strings.TrimSpace(strl), "\n")
+
+	if len(lines) != len(expected) {
+		return fmt.Errorf("Expected %d log entries, got %d\n", len(expected), len(lines))
+	}
+
+	for i, l := range lines {
+		line := strings.TrimSpace(l)
+
+		parsed := parseLog(line)
+		if parsed == nil {
+			return fmt.Errorf("Failed to parse log entry \"%s\"", line)
+		}
+
+		index, err := strconv.Atoi(parsed.message)
+		if err != nil {
+			return fmt.Errorf("Expected numeric message, got \"%s\"", parsed.message)
+		}
+
+		if index != expected[i] {
+			return fmt.Errorf("Expected message \"%d\", got \"%d\"", expected[i], index)
+		}
+	}
+
+	return nil
 }
 
 func BenchmarkLog(b *testing.B) {
