@@ -2,7 +2,13 @@ package log
 
 import (
 	"bytes"
+	"compress/gzip"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -12,7 +18,7 @@ const regexLevel = "trace|debug|info|warn|error|fatal"
 const regexDate = "[0-9]+-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"
 
 var regexLog = regexp.MustCompile(`^\[(` + regexLevel + `)\]( \[(` + regexDate + `)\])? ?(.*)$`)
-var regexTime = regexp.MustCompile(` (0|0\.[0-9][0-9][0-9]? ms|[0-9]+ (ms|s|m|h))$`)
+var regexTime = regexp.MustCompile(` (0|0\.[0-9]{1,3} ms|[0-9]+ (ms|s|m|h))$`)
 
 type ParsedLog struct {
 	level    string
@@ -66,13 +72,13 @@ func TestLevels(t *testing.T) {
 	Warn("test warn")
 	Error("test error")
 	Fatal("test fatal")
+	Close() // Only for coverage
 
 	expected := [...]string{"trace", "debug", "info", "warn", "error", "fatal"}
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
 
 	if len(lines) != len(expected) {
-		t.Fatalf("Expected %d log entries, got %d\n", len(lines), len(expected))
-		return
+		t.Fatalf("Expected %d log entries, got %d\n", len(expected), len(lines))
 	}
 
 	for i, l := range lines {
@@ -80,7 +86,7 @@ func TestLevels(t *testing.T) {
 
 		parsed := parseLog(line)
 		if parsed == nil {
-			t.Errorf("Filed to parse log entry \"%s\"", line)
+			t.Errorf("Failed to parse log entry \"%s\"", line)
 			continue
 		}
 
@@ -94,9 +100,6 @@ func TestLevels(t *testing.T) {
 			t.Errorf("Expected message \"test %s\", got \"%s\"", e, parsed.message)
 		}
 	}
-
-	// Only for coverage
-	Close()
 }
 
 func TestDate(t *testing.T) {
@@ -113,7 +116,7 @@ func TestDate(t *testing.T) {
 
 	parsed := parseLog(msg)
 	if parsed == nil {
-		t.Fatalf("Filed to parse log entry \"%s\"", msg)
+		t.Fatalf("Failed to parse log entry \"%s\"", msg)
 	}
 
 	layout := strings.Replace(time.RFC3339, "T", " ", 1)
@@ -158,7 +161,7 @@ func TestMinLevel(t *testing.T) {
 
 		parsed := parseLog(line)
 		if parsed == nil {
-			t.Errorf("Filed to parse log entry \"%s\"", line)
+			t.Errorf("Failed to parse log entry \"%s\"", line)
 			continue
 		}
 
@@ -180,7 +183,7 @@ func TestConcat(t *testing.T) {
 	msg := buf.String()
 	parsed := parseLog(msg)
 	if parsed == nil {
-		t.Errorf("Filed to parse log entry \"%s\"", msg)
+		t.Errorf("Failed to parse log entry \"%s\"", msg)
 	} else if parsed.message != "abc 1 -1 0.5 true <nil>" {
 		t.Errorf("Concating and converting values to string does not work")
 	}
@@ -201,11 +204,10 @@ func TestTimeDiff(t *testing.T) {
 	Info("test")
 
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
-	expected := []string{"", "123 ms", "3 s", "0"}
+	expected := []string{"^$", `^12[3-6] ms$`, "^3 s$", `^0(.0[1-4] ms)?$`}
 
 	if len(lines) != len(expected) {
-		t.Fatalf("Expected %d log entries, got %d\n", len(lines), len(expected))
-		return
+		t.Fatalf("Expected %d log entries, got %d\n", len(expected), len(lines))
 	}
 
 	for i, l := range lines {
@@ -213,12 +215,15 @@ func TestTimeDiff(t *testing.T) {
 
 		parsed := parseLog(line)
 		if parsed == nil {
-			t.Errorf("Filed to parse log entry \"%s\"", line)
+			t.Errorf("Failed to parse log entry \"%s\"", line)
 			continue
 		}
 
-		if parsed.timediff != expected[i] {
-			t.Errorf("Ecpected time diff \"%s\", got \"%s\"", expected[i], parsed.timediff)
+		e := expected[i]
+		expreg := regexp.MustCompile(e)
+
+		if !expreg.MatchString(parsed.timediff) {
+			t.Errorf("Expected time diff to match \"%s\", got \"%s\"", e, parsed.timediff)
 		}
 	}
 }
@@ -277,6 +282,166 @@ func TestColor(t *testing.T) {
 			continue
 		}
 	}
+}
+
+func TestFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.log")
+
+	tp := &FileTransporter{
+		Path: path,
+		Date: true,
+	}
+
+	Init(tp)
+	Debug("test")
+	Info("test")
+	Close()
+
+	Init(tp)
+	Error("test")
+	Close()
+
+	logs, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(logs)), "\n")
+	expected := []string{"debug", "info", "error"}
+
+	if len(lines) != len(expected) {
+		t.Fatalf("Expected %d log entries, got %d\n", len(expected), len(lines))
+	}
+
+	for i, l := range lines {
+		line := strings.TrimSpace(l)
+
+		parsed := parseLog(line)
+		if parsed == nil {
+			t.Errorf("Failed to parse log entry \"%s\"", line)
+			continue
+		}
+
+		if parsed.level != expected[i] || parsed.message != "test" {
+			t.Errorf("Log entry \"%s\" does not match", line)
+			continue
+		}
+	}
+}
+
+func TestRotate(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.log")
+
+	tp := &FileTransporter{
+		Path:        path,
+		Date:        true,
+		RotateLines: 4,
+		Rotations:   4,
+	}
+
+	Init(tp)
+
+	for i := 0; i < 19; i++ {
+		Info(i + 1)
+
+		if i > 0 && i%5 == 0 { // Close to count number of lines at Init()
+			Close()
+			Init(tp)
+		}
+	}
+
+	Close()
+
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("Failed to read dir: %s", err.Error())
+	}
+
+	expected := map[string][]int{
+		"test.log":      {17, 18, 19},
+		"test.log.1.gz": {13, 14, 15, 16},
+		"test.log.2.gz": {9, 10, 11, 12},
+		"test.log.3.gz": {5, 6, 7, 8},
+	}
+
+	if len(files) != len(expected) {
+		t.Fatalf("Expected %d log files, got %d\n", len(expected), len(files))
+	}
+
+	for _, f := range files {
+		name := f.Name()
+		path := filepath.Join(dir, name)
+
+		nums, ok := expected[name]
+		if !ok {
+			t.Fatalf("Found unexpected log file \"%s\"\n", name)
+		}
+
+		err := readLogfile(path, strings.HasSuffix(path, ".gz"), nums)
+		if err != nil {
+			t.Fatalf("%s: %s", name, err.Error())
+		}
+	}
+}
+
+func readLogfile(path string, compressed bool, expected []int) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+
+	defer f.Close()
+
+	var strl string
+	if compressed {
+		w, err := gzip.NewReader(f)
+		if err != nil {
+			return err
+		}
+
+		defer w.Close()
+
+		c, err := ioutil.ReadAll(w)
+		if err != nil {
+			return err
+		}
+
+		strl = string(c)
+	} else {
+		c, err := ioutil.ReadAll(f)
+		if err != nil {
+			return err
+		}
+
+		strl = string(c)
+	}
+
+	lines := strings.Split(strings.TrimSpace(strl), "\n")
+
+	if len(lines) != len(expected) {
+		return fmt.Errorf("Expected %d log entries, got %d\n", len(expected), len(lines))
+	}
+
+	for i, l := range lines {
+		line := strings.TrimSpace(l)
+
+		parsed := parseLog(line)
+		if parsed == nil {
+			return fmt.Errorf("Failed to parse log entry \"%s\"", line)
+		}
+
+		index, err := strconv.Atoi(parsed.message)
+		if err != nil {
+			return fmt.Errorf("Expected numeric message, got \"%s\"", parsed.message)
+		}
+
+		if index != expected[i] {
+			return fmt.Errorf("Expected message \"%d\", got \"%d\"", expected[i], index)
+		}
+	}
+
+	return nil
 }
 
 func BenchmarkLog(b *testing.B) {

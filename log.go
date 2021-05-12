@@ -16,18 +16,31 @@ func init() {
 	}
 
 	transports = append(transports, &transport)
+
 	mutex = new(sync.Mutex)
 }
 
 // Init initializes the logger by adding the given transporters to the logger.
 // In addition to the console transporter, logging can also be send to a server.
+// If an transporter implements the Init-function and it returns an error, the error is returned
+// and the logger will not be initialiazed.
 //
 // This call is optional. If this function is not called, it will only be logged to the console.
-func Init(t ...Transporter) {
+func Init(t ...Transporter) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
+	for _, transport := range t {
+		if it, ok := transport.(initTransporter); ok {
+			err := it.Init()
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	transports = t
+	return nil
 }
 
 // Close closes all transporters.
@@ -37,8 +50,11 @@ func Close() {
 	defer mutex.Unlock()
 
 	for _, transport := range transports {
-		transport.Close()
+		if ct, ok := transport.(closeTransporter); ok {
+			ct.Close()
+		}
 	}
+
 	transports = []Transporter{}
 }
 
