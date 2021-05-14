@@ -1,8 +1,8 @@
 package log
 
 import (
-	"bytes"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -64,17 +64,12 @@ func (l *Logger) Log(level Level, a []interface{}, date *time.Time) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	var buff bytes.Buffer
-
-	length := len(a)
-	for i, v := range a {
-		buff.WriteString(fmt.Sprintf("%+v", v))
-		if i < length-1 {
-			buff.WriteRune(' ')
-		}
+	args := make([]string, len(a))
+	for i, arg := range a {
+		args[i] = fmt.Sprintf("%+v", arg)
 	}
 
-	msg := buff.String()
+	msg := strings.Join(args, " ")
 
 	var d time.Time
 	if date != nil {
