@@ -1,8 +1,8 @@
 package log
 
 import (
-	"bytes"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -60,26 +60,26 @@ func (l *Logger) init(ts ...Transporter) error {
 }
 
 // Log performs the respective logging by sending the log entry to all transporters.
-func (l *Logger) Log(level Level, a ...interface{}) {
+func (l *Logger) Log(level Level, a []interface{}, date *time.Time) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	date := time.Now()
-
-	var buff bytes.Buffer
-
-	length := len(a)
-	for i, v := range a {
-		buff.WriteString(fmt.Sprintf("%+v", v))
-		if i < length-1 {
-			buff.WriteRune(' ')
-		}
+	args := make([]string, len(a))
+	for i, arg := range a {
+		args[i] = fmt.Sprintf("%+v", arg)
 	}
 
-	msg := buff.String()
+	msg := strings.Join(args, " ")
+
+	var d time.Time
+	if date != nil {
+		d = *date
+	} else {
+		d = time.Now()
+	}
 
 	for _, t := range l.ts {
-		t.Transport(level, msg, date)
+		t.Transport(level, msg, d)
 	}
 }
 
@@ -109,32 +109,32 @@ func Init(ts ...Transporter) error {
 
 // Trace creates a log entry with the "trace" level
 func Trace(a ...interface{}) {
-	l.Log(levelTrace, a...)
+	l.Log(levelTrace, a, nil)
 }
 
 // Debug creates a log entry with the "debug" level
 func Debug(a ...interface{}) {
-	l.Log(levelDebug, a...)
+	l.Log(levelDebug, a, nil)
 }
 
 // Info creates a log entry with the "info" level
 func Info(a ...interface{}) {
-	l.Log(levelInfo, a...)
+	l.Log(levelInfo, a, nil)
 }
 
 // Warn creates a log entry with the "warn" level
 func Warn(a ...interface{}) {
-	l.Log(levelWarn, a...)
+	l.Log(levelWarn, a, nil)
 }
 
 // Error creates a log entry with the "error" level
 func Error(a ...interface{}) {
-	l.Log(levelError, a...)
+	l.Log(levelError, a, nil)
 }
 
 // Fatal creates a log entry with the "fatal" level
 func Fatal(a ...interface{}) {
-	l.Log(levelFatal, a...)
+	l.Log(levelFatal, a, nil)
 }
 
 // Close closes all transporters.

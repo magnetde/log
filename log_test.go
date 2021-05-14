@@ -66,7 +66,7 @@ func TestLogger(t *testing.T) {
 		Output: &buf,
 	})
 
-	l.Log("info")
+	l.Log("info", nil, nil)
 	l.Close()
 
 	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")

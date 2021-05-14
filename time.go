@@ -10,11 +10,10 @@ func now() int64 {
 	return time.Now().UnixNano()
 }
 
-func formatDate(t time.Time) string {
-	layout := strings.Replace(time.RFC3339, "T", " ", 1)
-	layout = strings.Split(layout, "Z")[0]
+var layout = strings.Split(strings.Replace(time.RFC3339, "T", " ", 1), "Z")[0]
 
-	return t.UTC().Local().Format(layout)
+func formatDate(t time.Time) string {
+	return t.Local().Format(layout)
 }
 
 func formatDiff(time int64) string {
