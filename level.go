@@ -43,23 +43,16 @@ func (l Level) Index() int {
 	}
 }
 
-// color colors the givewn text in the color assigned to the level.
+var colors = []*color.Color{
+	color.New(),
+	color.New(color.FgBlue),
+	color.New(color.FgCyan),
+	color.New(color.FgGreen),
+	color.New(color.FgYellow),
+	color.New(color.FgRed),
+	color.New(color.FgRed, color.Bold),
+}
+
 func (l Level) color(str string) string {
-	switch l {
-	case levelTrace:
-		return color.BlueString(str)
-	case levelDebug:
-		return color.CyanString(str)
-	case levelInfo:
-		return color.GreenString(str)
-	case levelWarn:
-		return color.YellowString(str)
-	case levelError:
-		return color.RedString(str)
-	case levelFatal:
-		boldRed := color.New(color.FgRed, color.Bold)
-		return boldRed.Sprint(str)
-	default:
-		return ""
-	}
+	return colors[l.Index()].Sprint(str)
 }

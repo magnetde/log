@@ -32,9 +32,10 @@ type stringTransporter interface {
 	setLastMessage(l int64)
 }
 
-func logToString(t stringTransporter, level Level, msg string, date time.Time) string {
-	const prefixLength = 5 + 2
+// 5 (length of trace, debug, error) + 2 (length auf two brackets)
+const prefixLength = 5 + 2
 
+func logToString(t stringTransporter, level Level, msg string, date time.Time) string {
 	prefix := padStart("["+string(level)+"]", prefixLength, " ")
 
 	if t.withColors() {
