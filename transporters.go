@@ -313,7 +313,7 @@ type logError struct {
 	Err string `json:"error"`
 }
 
-func (t *ServerTransporter) Init() {
+func (t *ServerTransporter) Init() error {
 	if t.MinLevel != "" && Level(t.MinLevel).Index() == 0 {
 		t.MinLevel = ""
 	}
