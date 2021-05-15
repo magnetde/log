@@ -319,6 +319,7 @@ func (t *ServerTransporter) Init() error {
 	}
 
 	t.runQueue()
+	return nil
 }
 
 func (t *ServerTransporter) runQueue() {
