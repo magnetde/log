@@ -77,10 +77,13 @@ type FileTransporter struct {
 	RotateLines int
 	Rotations   int
 
+	SuppressErrors bool
+
 	file   *os.File
 	fsize  int64
 	flines int
 
+	closed  bool
 	queue   *queue
 	lastMsg int64
 }
@@ -114,7 +117,10 @@ func (t *FileTransporter) Init() error {
 		return err
 	}
 
+	t.closed = false
 	t.runQueue()
+	t.lastMsg = 0
+
 	return nil
 }
 
@@ -242,9 +248,11 @@ func (t *FileTransporter) rotateArchives(dir string, prefix string) error {
 }
 
 func (t *FileTransporter) showError(err error) {
-	log := ConsoleTransporter{Colors: true}
-	date := time.Now()
-	log.Transport(levelError, "Failed to rotate log file: "+err.Error(), date)
+	if !t.SuppressErrors {
+		log := ConsoleTransporter{Colors: true}
+		date := time.Now()
+		log.Transport(levelError, "Failed to rotate log file: "+err.Error(), date)
+	}
 }
 
 func (t *FileTransporter) withDate() bool {
@@ -265,7 +273,7 @@ func (t *FileTransporter) setLastMessage(l int64) {
 
 // Transport writes the log entry to the file.
 func (t *FileTransporter) Transport(level Level, msg string, date time.Time) {
-	if !level.GreaterEquals(Level(t.MinLevel)) {
+	if t.closed || !level.GreaterEquals(Level(t.MinLevel)) {
 		return
 	}
 
@@ -280,6 +288,7 @@ func (t *FileTransporter) Transport(level Level, msg string, date time.Time) {
 
 // Close closes the log file.
 func (t *FileTransporter) Close() {
+	t.closed = true
 	t.queue.close()
 	t.file.Close()
 }
@@ -297,16 +306,19 @@ type ServerTransporter struct {
 
 	MinLevel string
 
+	SuppressErrors bool
+
+	closed         bool
 	queue          *queue
 	lastErrorShown int64
 }
 
 type serverLogEntry struct {
-	Type    string `json:"type"`
-	Level   Level  `json:"level"`
-	Date    string `json:"date"`
-	Message string `json:"message"`
-	Secret  string `json:"secret,omitempty"`
+	Type    string    `json:"type"`
+	Level   Level     `json:"level"`
+	Date    time.Time `json:"date"`
+	Message string    `json:"message"`
+	Secret  string    `json:"secret,omitempty"`
 }
 
 type logError struct {
@@ -318,7 +330,10 @@ func (t *ServerTransporter) Init() error {
 		t.MinLevel = ""
 	}
 
+	t.closed = false
 	t.runQueue()
+	t.lastErrorShown = 0
+
 	return nil
 }
 
@@ -387,7 +402,7 @@ func (t *ServerTransporter) runQueue() {
 }
 
 func (t *ServerTransporter) showError(err error) {
-	if t.lastErrorShown+10*int64(time.Minute) < now() {
+	if !t.SuppressErrors && t.lastErrorShown+10*int64(time.Minute) < now() {
 		log := ConsoleTransporter{Colors: true}
 		date := time.Now()
 		log.Transport(levelError, "Failed to send log to server: "+err.Error(), date)
@@ -398,14 +413,14 @@ func (t *ServerTransporter) showError(err error) {
 
 // Transport send the log entry to the server.
 func (t *ServerTransporter) Transport(level Level, msg string, date time.Time) {
-	if !level.GreaterEquals(Level(t.MinLevel)) {
+	if t.closed || !level.GreaterEquals(Level(t.MinLevel)) {
 		return
 	}
 
 	e := serverLogEntry{
 		Type:    t.Type,
 		Level:   level,
-		Date:    date.Format(time.RFC3339),
+		Date:    date,
 		Message: msg,
 	}
 
@@ -418,5 +433,6 @@ func (t *ServerTransporter) Transport(level Level, msg string, date time.Time) {
 
 // Close waits until the log entries have been sent to the server and then deletes the queue.
 func (t *ServerTransporter) Close() {
+	t.closed = true
 	t.queue.close()
 }
