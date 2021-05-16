@@ -77,6 +77,8 @@ type FileTransporter struct {
 	RotateLines int
 	Rotations   int
 
+	SuppressErrors bool
+
 	file   *os.File
 	fsize  int64
 	flines int
@@ -242,9 +244,11 @@ func (t *FileTransporter) rotateArchives(dir string, prefix string) error {
 }
 
 func (t *FileTransporter) showError(err error) {
-	log := ConsoleTransporter{Colors: true}
-	date := time.Now()
-	log.Transport(levelError, "Failed to rotate log file: "+err.Error(), date)
+	if !t.SuppressErrors {
+		log := ConsoleTransporter{Colors: true}
+		date := time.Now()
+		log.Transport(levelError, "Failed to rotate log file: "+err.Error(), date)
+	}
 }
 
 func (t *FileTransporter) withDate() bool {
@@ -296,6 +300,8 @@ type ServerTransporter struct {
 	Secret string
 
 	MinLevel string
+
+	SuppressErrors bool
 
 	queue          *queue
 	lastErrorShown int64
@@ -387,7 +393,7 @@ func (t *ServerTransporter) runQueue() {
 }
 
 func (t *ServerTransporter) showError(err error) {
-	if t.lastErrorShown+10*int64(time.Minute) < now() {
+	if !t.SuppressErrors && t.lastErrorShown+10*int64(time.Minute) < now() {
 		log := ConsoleTransporter{Colors: true}
 		date := time.Now()
 		log.Transport(levelError, "Failed to send log to server: "+err.Error(), date)
