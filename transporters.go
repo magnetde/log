@@ -81,6 +81,7 @@ type FileTransporter struct {
 	fsize  int64
 	flines int
 
+	closed  bool
 	queue   *queue
 	lastMsg int64
 }
@@ -114,7 +115,10 @@ func (t *FileTransporter) Init() error {
 		return err
 	}
 
+	t.closed = false
 	t.runQueue()
+	t.lastMsg = 0
+
 	return nil
 }
 
@@ -265,7 +269,7 @@ func (t *FileTransporter) setLastMessage(l int64) {
 
 // Transport writes the log entry to the file.
 func (t *FileTransporter) Transport(level Level, msg string, date time.Time) {
-	if !level.GreaterEquals(Level(t.MinLevel)) {
+	if t.closed || !level.GreaterEquals(Level(t.MinLevel)) {
 		return
 	}
 
@@ -280,6 +284,7 @@ func (t *FileTransporter) Transport(level Level, msg string, date time.Time) {
 
 // Close closes the log file.
 func (t *FileTransporter) Close() {
+	t.closed = true
 	t.queue.close()
 	t.file.Close()
 }
@@ -297,6 +302,7 @@ type ServerTransporter struct {
 
 	MinLevel string
 
+	closed         bool
 	queue          *queue
 	lastErrorShown int64
 }
@@ -318,7 +324,10 @@ func (t *ServerTransporter) Init() error {
 		t.MinLevel = ""
 	}
 
+	t.closed = false
 	t.runQueue()
+	t.lastErrorShown = 0
+
 	return nil
 }
 
@@ -398,7 +407,7 @@ func (t *ServerTransporter) showError(err error) {
 
 // Transport send the log entry to the server.
 func (t *ServerTransporter) Transport(level Level, msg string, date time.Time) {
-	if !level.GreaterEquals(Level(t.MinLevel)) {
+	if t.closed || !level.GreaterEquals(Level(t.MinLevel)) {
 		return
 	}
 
@@ -418,5 +427,6 @@ func (t *ServerTransporter) Transport(level Level, msg string, date time.Time) {
 
 // Close waits until the log entries have been sent to the server and then deletes the queue.
 func (t *ServerTransporter) Close() {
+	t.closed = true
 	t.queue.close()
 }
