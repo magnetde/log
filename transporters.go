@@ -308,11 +308,11 @@ type ServerTransporter struct {
 }
 
 type serverLogEntry struct {
-	Type    string `json:"type"`
-	Level   Level  `json:"level"`
-	Date    string `json:"date"`
-	Message string `json:"message"`
-	Secret  string `json:"secret,omitempty"`
+	Type    string    `json:"type"`
+	Level   Level     `json:"level"`
+	Date    time.Time `json:"date"`
+	Message string    `json:"message"`
+	Secret  string    `json:"secret,omitempty"`
 }
 
 type logError struct {
@@ -414,7 +414,7 @@ func (t *ServerTransporter) Transport(level Level, msg string, date time.Time) {
 	e := serverLogEntry{
 		Type:    t.Type,
 		Level:   level,
-		Date:    date.Format(time.RFC3339),
+		Date:    date,
 		Message: msg,
 	}
 
