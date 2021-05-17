@@ -326,6 +326,12 @@ type logError struct {
 }
 
 func (t *ServerTransporter) Init() error {
+	if t.Type == "" {
+		return errors.New("empty log type")
+	}
+	if t.URL == "" {
+		return errors.New("empty url")
+	}
 	if t.MinLevel != "" && Level(t.MinLevel).Index() == 0 {
 		t.MinLevel = ""
 	}
