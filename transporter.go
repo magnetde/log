@@ -42,8 +42,7 @@ func logToString(t stringTransporter, level Level, msg string, date time.Time) s
 		prefix = level.color(prefix)
 	}
 
-	var result bytes.Buffer
-	result.WriteString(prefix)
+	result := bytes.NewBufferString(prefix)
 
 	if t.withDate() {
 		dateStr := formatDate(date)
