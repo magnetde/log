@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/fatih/color"
 )
 
 const regexLevel = "trace|debug|info|warn|error|fatal"
@@ -310,6 +312,27 @@ func TestColor(t *testing.T) {
 		if !bytes.HasPrefix([]byte(line), prefix) {
 			t.Errorf("Wrong color at log level %s", level)
 			continue
+		}
+	}
+}
+
+func TestNoColor(t *testing.T) {
+	var buf bytes.Buffer
+
+	Init(&ConsoleTransporter{
+		Colors: false,
+		Output: &buf,
+	})
+
+	Info("test")
+	Info(color.RedString("red"))
+	Info(color.New(color.Bold, color.FgRed).Sprint("test"))
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+
+	for _, line := range lines {
+		if colorRegex.MatchString(line) {
+			t.Fatalf("Colors found in log entry: %s", line)
 		}
 	}
 }
