@@ -450,7 +450,7 @@ func readLogfile(path string, compressed bool, expected []int) error {
 	lines := strings.Split(strings.TrimSpace(strl), "\n")
 
 	if len(lines) != len(expected) {
-		return fmt.Errorf("Expected %d log entries, got %d\n", len(expected), len(lines))
+		return fmt.Errorf("expected %d log entries, got %d", len(expected), len(lines))
 	}
 
 	for i, l := range lines {
@@ -458,16 +458,16 @@ func readLogfile(path string, compressed bool, expected []int) error {
 
 		parsed := parseLog(line)
 		if parsed == nil {
-			return fmt.Errorf("Failed to parse log entry \"%s\"", line)
+			return fmt.Errorf("failed to parse log entry \"%s\"", line)
 		}
 
 		index, err := strconv.Atoi(parsed.message)
 		if err != nil {
-			return fmt.Errorf("Expected numeric message, got \"%s\"", parsed.message)
+			return fmt.Errorf("expected numeric message, got \"%s\"", parsed.message)
 		}
 
 		if index != expected[i] {
-			return fmt.Errorf("Expected message \"%d\", got \"%d\"", expected[i], index)
+			return fmt.Errorf("expected message \"%d\", got \"%d\"", expected[i], index)
 		}
 	}
 
