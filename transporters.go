@@ -54,7 +54,7 @@ func (t *ConsoleTransporter) setLastMessage(l int64) {
 
 // Transport prints the log entry.
 func (t *ConsoleTransporter) Transport(level Level, msg string, date time.Time) {
-	if !level.GreaterEquals(Level(t.MinLevel)) {
+	if level.Index() < Level(t.MinLevel).Index() {
 		return
 	}
 
@@ -66,6 +66,7 @@ func (t *ConsoleTransporter) Transport(level Level, msg string, date time.Time) 
 	t.Output.Write([]byte(result))
 }
 
+// FileTransporter writes log entries to a file.
 type FileTransporter struct {
 	Path string
 
@@ -88,12 +89,15 @@ type FileTransporter struct {
 	lastMsg int64
 }
 
+// fileLogEntry is used for elements on the queue
 type fileLogEntry struct {
 	level   Level
 	message string
 	date    time.Time
 }
 
+// Init opens the log file.
+// If rotation is enabled, the file size or the number of lines in the file is also counted, if necessary.
 func (t *FileTransporter) Init() error {
 	if t.MinLevel != "" && Level(t.MinLevel).Index() == 0 {
 		t.MinLevel = ""
@@ -105,26 +109,35 @@ func (t *FileTransporter) Init() error {
 		return err
 	}
 
-	stats, err := t.file.Stat()
-	if err != nil {
-		return err
+	if t.RotateBytes > 0 {
+		stats, err := t.file.Stat()
+		if err != nil {
+			return err
+		}
+
+		t.fsize = stats.Size()
+	} else {
+		t.fsize = 0
 	}
 
-	t.fsize = stats.Size()
-
-	t.flines, err = countLines(t.file)
-	if err != nil {
-		return err
+	if t.RotateLines > 0 {
+		t.flines, err = countLines(t.file)
+		if err != nil {
+			return err
+		}
+	} else {
+		t.flines = 0
 	}
 
 	t.closed = false
-	t.runQueue()
+	t.queue = t.runQueue()
 	t.lastMsg = 0
 
 	return nil
 }
 
-func (t *FileTransporter) runQueue() {
+// runQueue creates the queue that runs jobs in the background.
+func (t *FileTransporter) runQueue() *queue {
 	q := newQueue(func(v interface{}) {
 		e, ok := v.(fileLogEntry)
 		if !ok {
@@ -133,9 +146,18 @@ func (t *FileTransporter) runQueue() {
 
 		result := logToString(t, e.level, e.message, e.date)
 
-		t.file.WriteString(result)
-		t.fsize += int64(len([]byte(result)))
-		t.flines += 1
+		n, err := t.file.WriteString(result)
+		if err != nil {
+			t.showError(err)
+			return
+		}
+
+		if t.RotateBytes > 0 {
+			t.fsize += int64(n)
+		}
+		if t.RotateLines > 0 {
+			t.flines++
+		}
 
 		// Check if rotation needed
 		if t.RotateBytes > 0 && t.fsize >= t.RotateBytes {
@@ -145,13 +167,14 @@ func (t *FileTransporter) runQueue() {
 		}
 	}, 1, 1024)
 
-	t.queue = q
+	return q
 }
 
 var regexName = regexp.MustCompile(`(.+).(\d+).gz`)
 
+// rotate rotates the current log file by compressing it and renaming or deleting previous rotations.
 func (t *FileTransporter) rotate() {
-	if t.fsize == 0 || t.flines == 0 {
+	if (t.RotateBytes > 0 && t.fsize == 0) || (t.RotateLines > 0 && t.flines == 0) {
 		return
 	}
 
@@ -206,6 +229,7 @@ func (t *FileTransporter) rotate() {
 	t.flines = 0
 }
 
+// rotateArchives rotates by incrementing the counter of each rotation by one (example: log.3.gz -> log.4.gz)
 func (t *FileTransporter) rotateArchives(dir string, prefix string) error {
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
@@ -247,11 +271,12 @@ func (t *FileTransporter) rotateArchives(dir string, prefix string) error {
 	return renameAll(renames)
 }
 
+// showError prints an error to the console.
 func (t *FileTransporter) showError(err error) {
 	if !t.SuppressErrors {
 		log := ConsoleTransporter{Colors: true}
 		date := time.Now()
-		log.Transport(levelError, "Failed to rotate log file: "+err.Error(), date)
+		log.Transport(levelError, "Failed to write log file: "+err.Error(), date)
 	}
 }
 
@@ -273,7 +298,7 @@ func (t *FileTransporter) setLastMessage(l int64) {
 
 // Transport writes the log entry to the file.
 func (t *FileTransporter) Transport(level Level, msg string, date time.Time) {
-	if t.closed || !level.GreaterEquals(Level(t.MinLevel)) {
+	if t.closed || level.Index() < Level(t.MinLevel).Index() {
 		return
 	}
 
@@ -313,6 +338,7 @@ type ServerTransporter struct {
 	lastErrorShown int64
 }
 
+// serverLogEntry is used to serialize JSON.
 type serverLogEntry struct {
 	Type    string    `json:"type"`
 	Level   Level     `json:"level"`
@@ -325,6 +351,7 @@ type logError struct {
 	Err string `json:"error"`
 }
 
+// Init initializes the logger by starting the queue among other things.
 func (t *ServerTransporter) Init() error {
 	if t.Type == "" {
 		return errors.New("empty log type")
@@ -337,13 +364,14 @@ func (t *ServerTransporter) Init() error {
 	}
 
 	t.closed = false
-	t.runQueue()
+	t.queue = t.runQueue()
 	t.lastErrorShown = 0
 
 	return nil
 }
 
-func (t *ServerTransporter) runQueue() {
+// runQueue creates the queue that runs jobs in the background.
+func (t *ServerTransporter) runQueue() *queue {
 	q := newQueue(func(v interface{}) {
 		entry, ok := v.(serverLogEntry)
 		if !ok {
@@ -404,9 +432,10 @@ func (t *ServerTransporter) runQueue() {
 		}
 	}, 1, 1024)
 
-	t.queue = q
+	return q
 }
 
+// showError prints an error to the console.
 func (t *ServerTransporter) showError(err error) {
 	if !t.SuppressErrors && t.lastErrorShown+10*int64(time.Minute) < now() {
 		log := ConsoleTransporter{Colors: true}
@@ -417,9 +446,9 @@ func (t *ServerTransporter) showError(err error) {
 	}
 }
 
-// Transport send the log entry to the server.
+// Transport sends the log entry to the server.
 func (t *ServerTransporter) Transport(level Level, msg string, date time.Time) {
-	if t.closed || !level.GreaterEquals(Level(t.MinLevel)) {
+	if t.closed || level.Index() < Level(t.MinLevel).Index() {
 		return
 	}
 
