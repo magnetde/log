@@ -331,6 +331,7 @@ type ServerTransporter struct {
 
 	MinLevel string
 
+	KeepColors     bool
 	SuppressErrors bool
 
 	closed         bool
@@ -450,6 +451,10 @@ func (t *ServerTransporter) showError(err error) {
 func (t *ServerTransporter) Transport(level Level, msg string, date time.Time) {
 	if t.closed || level.Index() < Level(t.MinLevel).Index() {
 		return
+	}
+
+	if !t.KeepColors {
+		msg = removeColors(msg)
 	}
 
 	e := serverLogEntry{
