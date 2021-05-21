@@ -322,12 +322,20 @@ func TestFile(t *testing.T) {
 		Date: true,
 	}
 
-	Init(tp)
+	err := Init(tp)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	Debug("test")
 	Info("test")
 	Close()
 
-	Init(tp)
+	err = Init(tp)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	Error("test")
 	Close()
 
@@ -370,14 +378,21 @@ func TestRotate(t *testing.T) {
 		Rotations:   4,
 	}
 
-	Init(tp)
+	err := Init(tp)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for i := 0; i < 19; i++ {
 		Info(i + 1)
 
 		if i > 0 && i%5 == 0 { // Close to count number of lines at Init()
 			Close()
-			Init(tp)
+
+			err := Init(tp)
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 

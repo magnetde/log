@@ -174,7 +174,7 @@ var regexName = regexp.MustCompile(`(.+).(\d+).gz`)
 
 // rotate rotates the current log file by compressing it and renaming or deleting previous rotations.
 func (t *FileTransporter) rotate() {
-	if t.fsize == 0 || t.flines == 0 {
+	if (t.RotateBytes > 0 && t.fsize == 0) || (t.RotateLines > 0 && t.flines == 0) {
 		return
 	}
 
