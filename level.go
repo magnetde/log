@@ -18,11 +18,6 @@ func init() {
 	color.NoColor = false
 }
 
-// GreaterEquals compares whether the current level is greater than or equal to the given minimum level.
-func (l Level) GreaterEquals(min Level) bool {
-	return l.Index() >= min.Index()
-}
-
 // Index returns the severity of the level.
 func (l Level) Index() int {
 	switch l {
@@ -53,6 +48,7 @@ var colors = []*color.Color{
 	color.New(color.FgRed, color.Bold),
 }
 
+// color changes the color of a string to the color assigned to the level.
 func (l Level) color(str string) string {
 	return colors[l.Index()].Sprint(str)
 }
