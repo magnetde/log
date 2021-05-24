@@ -20,7 +20,7 @@ const regexLevel = "trace|debug|info|warn|error|fatal"
 const regexDate = "[0-9]+-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"
 
 var regexLog = regexp.MustCompile(`^\[(` + regexLevel + `)\]( \[(` + regexDate + `)\])? ?(.*)$`)
-var regexTime = regexp.MustCompile(` (0|0\.[0-9]{1,3} ms|[0-9]+ (ms|s|m|h))$`)
+var regexTime = regexp.MustCompile(` \+(0|0\.[0-9]{1,3}ms|[0-9]+(ms|s|m|h))$`)
 
 type ParsedLog struct {
 	level    string
@@ -45,7 +45,7 @@ func parseLog(line string) *ParsedLog {
 	timeGroups := regexTime.FindStringSubmatch(groups[4])
 
 	if len(timeGroups) > 0 {
-		timediff := timeGroups[1]
+		timediff := "+" + timeGroups[1]
 
 		parsed.message = strings.TrimSuffix(groups[4], " "+timediff)
 		parsed.timediff = timediff
@@ -236,7 +236,7 @@ func TestTimeDiff(t *testing.T) {
 	Info("test")
 
 	lines := strings.Split(strings.TrimSpace(b.String()), "\n")
-	expected := []string{"^$", `^12[3-6] ms$`, "^3 s$", `^0(\.0[1-6] ms)?$`}
+	expected := []string{"^$", `^\+12[3-6]ms$`, `^\+3s$`, `^\+0(\.0[1-6]ms)?$`}
 
 	if len(lines) != len(expected) {
 		t.Fatalf("Expected %d log entries, got %d\n", len(expected), len(lines))
