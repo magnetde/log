@@ -72,7 +72,7 @@ func logToString(t stringTransporter, level Level, msg string, date time.Time) s
 			timeDiff = color.WhiteString(timeDiff)
 		}
 
-		result.WriteRune(' ')
+		result.WriteString(" +")
 		result.WriteString(timeDiff)
 	}
 
