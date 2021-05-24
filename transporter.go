@@ -66,13 +66,13 @@ func logToString(t stringTransporter, level Level, msg string, date time.Time) s
 
 	if t.lastMessage() != 0 {
 		diff := now() - t.lastMessage()
-		timeDiff := formatDiff(diff)
+		timeDiff := "+" + formatDiff(diff)
 
 		if t.withColors() {
 			timeDiff = color.WhiteString(timeDiff)
 		}
 
-		result.WriteString(" +")
+		result.WriteRune(' ')
 		result.WriteString(timeDiff)
 	}
 
