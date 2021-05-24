@@ -20,7 +20,7 @@ const regexLevel = "trace|debug|info|warn|error|fatal"
 const regexDate = "[0-9]+-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}"
 
 var regexLog = regexp.MustCompile(`^\[(` + regexLevel + `)\]( \[(` + regexDate + `)\])? ?(.*)$`)
-var regexTime = regexp.MustCompile(` (0|0\.[0-9]{1,3} ms|[0-9]+ (ms|s|m|h))$`)
+var regexTime = regexp.MustCompile(` \+(0|0\.[0-9]{1,3}ms|[0-9]+(ms|s|m|h))$`)
 
 type ParsedLog struct {
 	level    string
@@ -45,7 +45,7 @@ func parseLog(line string) *ParsedLog {
 	timeGroups := regexTime.FindStringSubmatch(groups[4])
 
 	if len(timeGroups) > 0 {
-		timediff := timeGroups[1]
+		timediff := "+" + timeGroups[1]
 
 		parsed.message = strings.TrimSuffix(groups[4], " "+timediff)
 		parsed.timediff = timediff
@@ -62,16 +62,16 @@ func TestDefault(t *testing.T) {
 }
 
 func TestLogger(t *testing.T) {
-	var buf bytes.Buffer
+	var b strings.Builder
 
 	l, _ := CreateLogger(&ConsoleTransporter{
-		Output: &buf,
+		Output: &b,
 	})
 
 	l.Log("info", nil, nil)
 	l.Close()
 
-	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	lines := strings.Split(strings.TrimSpace(b.String()), "\n")
 
 	if len(lines) != 1 {
 		t.Fatalf("Expected 1 log entry, got %d\n", len(lines))
@@ -92,10 +92,10 @@ func TestLogger(t *testing.T) {
 }
 
 func TestLevels(t *testing.T) {
-	var buf bytes.Buffer
+	var b strings.Builder
 
 	Init(&ConsoleTransporter{
-		Output: &buf,
+		Output: &b,
 	})
 
 	Trace("test trace")
@@ -107,7 +107,7 @@ func TestLevels(t *testing.T) {
 	Close() // Only for coverage
 
 	expected := [...]string{"trace", "debug", "info", "warn", "error", "fatal"}
-	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	lines := strings.Split(strings.TrimSpace(b.String()), "\n")
 
 	if len(lines) != len(expected) {
 		t.Fatalf("Expected %d log entries, got %d\n", len(expected), len(lines))
@@ -135,16 +135,16 @@ func TestLevels(t *testing.T) {
 }
 
 func TestDate(t *testing.T) {
-	var buf bytes.Buffer
+	var b strings.Builder
 
 	Init(&ConsoleTransporter{
 		Date:   true,
-		Output: &buf,
+		Output: &b,
 	})
 
 	Info("test date")
 
-	msg := strings.TrimSpace(buf.String())
+	msg := strings.TrimSpace(b.String())
 
 	parsed := parseLog(msg)
 	if parsed == nil {
@@ -172,11 +172,11 @@ func TestDate(t *testing.T) {
 }
 
 func TestMinLevel(t *testing.T) {
-	var buf bytes.Buffer
+	var b strings.Builder
 
 	Init(&ConsoleTransporter{
 		MinLevel: "warn",
-		Output:   &buf,
+		Output:   &b,
 	})
 
 	Trace("test")
@@ -186,7 +186,7 @@ func TestMinLevel(t *testing.T) {
 	Error("test")
 	Fatal("test")
 
-	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	lines := strings.Split(strings.TrimSpace(b.String()), "\n")
 
 	for _, l := range lines {
 		line := strings.TrimSpace(l)
@@ -204,15 +204,15 @@ func TestMinLevel(t *testing.T) {
 }
 
 func TestConcat(t *testing.T) {
-	var buf bytes.Buffer
+	var b strings.Builder
 
 	Init(&ConsoleTransporter{
-		Output: &buf,
+		Output: &b,
 	})
 
 	Info("abc", 1, -1, 0.5, true, nil)
 
-	msg := buf.String()
+	msg := b.String()
 	parsed := parseLog(msg)
 	if parsed == nil {
 		t.Errorf("Failed to parse log entry \"%s\"", msg)
@@ -222,10 +222,10 @@ func TestConcat(t *testing.T) {
 }
 
 func TestTimeDiff(t *testing.T) {
-	var buf bytes.Buffer
+	var b strings.Builder
 
 	Init(&ConsoleTransporter{
-		Output: &buf,
+		Output: &b,
 	})
 
 	Info("test")
@@ -235,8 +235,8 @@ func TestTimeDiff(t *testing.T) {
 	Info("test")
 	Info("test")
 
-	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
-	expected := []string{"^$", `^12[3-6] ms$`, "^3 s$", `^0(\.0[1-6] ms)?$`}
+	lines := strings.Split(strings.TrimSpace(b.String()), "\n")
+	expected := []string{"^$", `^\+12[3-6]ms$`, `^\+3s$`, `^\+0(\.0[1-6]ms)?$`}
 
 	if len(lines) != len(expected) {
 		t.Fatalf("Expected %d log entries, got %d\n", len(expected), len(lines))
@@ -261,12 +261,12 @@ func TestTimeDiff(t *testing.T) {
 }
 
 func TestColor(t *testing.T) {
-	var buf bytes.Buffer
+	var b strings.Builder
 
 	Init(&ConsoleTransporter{
 		Colors: true,
 		Date:   true,
-		Output: &buf,
+		Output: &b,
 	})
 
 	Trace("test")
@@ -276,7 +276,7 @@ func TestColor(t *testing.T) {
 	Error("test")
 	Fatal("test")
 
-	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	lines := strings.Split(strings.TrimSpace(b.String()), "\n")
 
 	regexLevel := regexp.MustCompile(`\[([a-z]+)\]`)
 
@@ -317,18 +317,18 @@ func TestColor(t *testing.T) {
 }
 
 func TestNoColor(t *testing.T) {
-	var buf bytes.Buffer
+	var b strings.Builder
 
 	Init(&ConsoleTransporter{
 		Colors: false,
-		Output: &buf,
+		Output: &b,
 	})
 
 	Info("test")
 	Info(color.RedString("red"))
 	Info(color.New(color.Bold, color.FgRed).Sprint("test"))
 
-	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	lines := strings.Split(strings.TrimSpace(b.String()), "\n")
 
 	for _, line := range lines {
 		if colorRegex.MatchString(line) {
@@ -529,12 +529,12 @@ func BenchmarkLogColorsDate(b *testing.B) {
 }
 
 func runBenchmark(b *testing.B, colors bool, date bool) {
-	var buf bytes.Buffer
+	var sb strings.Builder
 
 	Init(&ConsoleTransporter{
 		Colors: colors,
 		Date:   date,
-		Output: &buf,
+		Output: &sb,
 	})
 
 	for i := 0; i < b.N; i++ {
@@ -553,8 +553,8 @@ func runBenchmark(b *testing.B, colors bool, date bool) {
 			Fatal("test")
 		}
 
-		if buf.Len() > 1_000_000 {
-			buf.Reset()
+		if sb.Len() > 1_000_000 {
+			sb.Reset()
 		}
 	}
 }

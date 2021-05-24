@@ -31,7 +31,7 @@ func formatDiff(time int64) string {
 		}
 
 		if time >= 951 { // print 1 ms instead of 1.0 ms
-			return "1 ms"
+			return "1ms"
 		}
 
 		var prec int
@@ -40,31 +40,31 @@ func formatDiff(time int64) string {
 		} else {
 			prec = 1
 		}
-		return strconv.FormatFloat(float64(time)/1000, 'f', prec, 64) + " ms"
+		return strconv.FormatFloat(float64(time)/1000, 'f', prec, 64) + "ms"
 	}
 
 	// milliseconds
 	time = (time / 1000)
 
 	if time < 1000 {
-		return strconv.FormatInt(time, 10) + " ms"
+		return strconv.FormatInt(time, 10) + "ms"
 	}
 
 	// seconds
 	time = (time / 1000)
 
 	if time < 60 {
-		return strconv.FormatInt(time, 10) + " s"
+		return strconv.FormatInt(time, 10) + "s"
 	}
 
 	// minutes
 	time = (time / 60)
 
 	if time < 60 {
-		return strconv.FormatInt(time, 10) + " m"
+		return strconv.FormatInt(time, 10) + "m"
 	}
 
 	time = (time / 60)
 
-	return strconv.FormatInt(time, 10) + " h"
+	return strconv.FormatInt(time, 10) + "h"
 }

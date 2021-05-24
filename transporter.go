@@ -1,7 +1,7 @@
 package log
 
 import (
-	"bytes"
+	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -44,7 +44,8 @@ func logToString(t stringTransporter, level Level, msg string, date time.Time) s
 		msg = removeColors(msg)
 	}
 
-	result := bytes.NewBufferString(prefix)
+	var result strings.Builder
+	result.WriteString(prefix)
 
 	if t.withDate() {
 		dateStr := formatDate(date)
@@ -71,7 +72,7 @@ func logToString(t stringTransporter, level Level, msg string, date time.Time) s
 			timeDiff = color.WhiteString(timeDiff)
 		}
 
-		result.WriteRune(' ')
+		result.WriteString(" +")
 		result.WriteString(timeDiff)
 	}
 

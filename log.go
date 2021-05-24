@@ -64,12 +64,14 @@ func (l *Logger) Log(level Level, a []interface{}, date *time.Time) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	args := make([]string, len(a))
-	for i, arg := range a {
-		args[i] = fmt.Sprintf("%+v", arg)
-	}
+	var msg strings.Builder
 
-	msg := strings.Join(args, " ")
+	for i, arg := range a {
+		msg.WriteString(fmt.Sprintf("%+v", arg))
+		if i < len(a)-1 {
+			msg.WriteRune(' ')
+		}
+	}
 
 	var d time.Time
 	if date != nil {
@@ -79,7 +81,7 @@ func (l *Logger) Log(level Level, a []interface{}, date *time.Time) {
 	}
 
 	for _, t := range l.ts {
-		t.Transport(level, msg, d)
+		t.Transport(level, msg.String(), d)
 	}
 }
 

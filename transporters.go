@@ -389,9 +389,9 @@ func (t *ServerTransporter) runQueue() *queue {
 			return
 		}
 
-		buff := bytes.NewBuffer(jsonData)
+		r := bytes.NewReader(jsonData)
 
-		req, err := http.NewRequest(http.MethodPost, t.URL, buff)
+		req, err := http.NewRequest(http.MethodPost, t.URL, r)
 		if err != nil {
 			t.showError(err)
 			return
