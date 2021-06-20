@@ -101,7 +101,10 @@ func renameRecursive(fmap map[string]string, filenames map[string]bool, file str
 	}
 
 	if _, ok := filenames[fmap[file]]; ok {
-		renameRecursive(fmap, filenames, fmap[file], depth+1)
+		err := renameRecursive(fmap, filenames, fmap[file], depth+1)
+		if err != nil {
+			return err
+		}
 	}
 
 	err := os.Rename(file, fmap[file])

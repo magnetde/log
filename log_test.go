@@ -68,7 +68,7 @@ func TestLogger(t *testing.T) {
 		Output: &b,
 	})
 
-	l.Log("info", nil, nil)
+	l.Log(LevelInfo, nil, nil)
 	l.Close()
 
 	lines := strings.Split(strings.TrimSpace(b.String()), "\n")
@@ -94,7 +94,7 @@ func TestLogger(t *testing.T) {
 func TestLevels(t *testing.T) {
 	var b strings.Builder
 
-	Init(&ConsoleTransporter{
+	_ = Init(&ConsoleTransporter{
 		Output: &b,
 	})
 
@@ -137,7 +137,7 @@ func TestLevels(t *testing.T) {
 func TestDate(t *testing.T) {
 	var b strings.Builder
 
-	Init(&ConsoleTransporter{
+	_ = Init(&ConsoleTransporter{
 		Date:   true,
 		Output: &b,
 	})
@@ -174,8 +174,8 @@ func TestDate(t *testing.T) {
 func TestMinLevel(t *testing.T) {
 	var b strings.Builder
 
-	Init(&ConsoleTransporter{
-		MinLevel: "warn",
+	_ = Init(&ConsoleTransporter{
+		MinLevel: LevelWarn,
 		Output:   &b,
 	})
 
@@ -206,7 +206,7 @@ func TestMinLevel(t *testing.T) {
 func TestConcat(t *testing.T) {
 	var b strings.Builder
 
-	Init(&ConsoleTransporter{
+	_ = Init(&ConsoleTransporter{
 		Output: &b,
 	})
 
@@ -224,7 +224,7 @@ func TestConcat(t *testing.T) {
 func TestTimeDiff(t *testing.T) {
 	var b strings.Builder
 
-	Init(&ConsoleTransporter{
+	_ = Init(&ConsoleTransporter{
 		Output: &b,
 	})
 
@@ -263,7 +263,7 @@ func TestTimeDiff(t *testing.T) {
 func TestColor(t *testing.T) {
 	var b strings.Builder
 
-	Init(&ConsoleTransporter{
+	_ = Init(&ConsoleTransporter{
 		Colors: true,
 		Date:   true,
 		Output: &b,
@@ -319,7 +319,7 @@ func TestColor(t *testing.T) {
 func TestNoColor(t *testing.T) {
 	var b strings.Builder
 
-	Init(&ConsoleTransporter{
+	_ = Init(&ConsoleTransporter{
 		Colors: false,
 		Output: &b,
 	})
@@ -531,7 +531,7 @@ func BenchmarkLogColorsDate(b *testing.B) {
 func runBenchmark(b *testing.B, colors bool, date bool) {
 	var sb strings.Builder
 
-	Init(&ConsoleTransporter{
+	_ = Init(&ConsoleTransporter{
 		Colors: colors,
 		Date:   date,
 		Output: &sb,
