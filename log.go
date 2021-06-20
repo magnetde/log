@@ -111,32 +111,32 @@ func Init(ts ...Transporter) error {
 
 // Trace creates a log entry with the "trace" level
 func Trace(a ...interface{}) {
-	l.Log(levelTrace, a, nil)
+	l.Log(LevelTrace, a, nil)
 }
 
 // Debug creates a log entry with the "debug" level
 func Debug(a ...interface{}) {
-	l.Log(levelDebug, a, nil)
+	l.Log(LevelDebug, a, nil)
 }
 
 // Info creates a log entry with the "info" level
 func Info(a ...interface{}) {
-	l.Log(levelInfo, a, nil)
+	l.Log(LevelInfo, a, nil)
 }
 
 // Warn creates a log entry with the "warn" level
 func Warn(a ...interface{}) {
-	l.Log(levelWarn, a, nil)
+	l.Log(LevelWarn, a, nil)
 }
 
 // Error creates a log entry with the "error" level
 func Error(a ...interface{}) {
-	l.Log(levelError, a, nil)
+	l.Log(LevelError, a, nil)
 }
 
 // Fatal creates a log entry with the "fatal" level
 func Fatal(a ...interface{}) {
-	l.Log(levelFatal, a, nil)
+	l.Log(LevelFatal, a, nil)
 }
 
 // Close closes all transporters.

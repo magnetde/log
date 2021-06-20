@@ -36,7 +36,7 @@ type stringTransporter interface {
 const prefixLength = 5 + 2
 
 func logToString(t stringTransporter, level Level, msg string, date time.Time) string {
-	prefix := padStart("["+string(level)+"]", prefixLength, " ")
+	prefix := padStart("["+level.String()+"]", prefixLength, " ")
 
 	if t.withColors() {
 		prefix = level.color(prefix)

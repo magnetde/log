@@ -3,38 +3,37 @@ package log
 import "github.com/fatih/color"
 
 // Level is the internal log level.
-type Level string
+type Level int
 
 const (
-	levelTrace Level = "trace"
-	levelDebug Level = "debug"
-	levelInfo  Level = "info"
-	levelWarn  Level = "warn"
-	levelError Level = "error"
-	levelFatal Level = "fatal"
+	LevelTrace Level = iota + 1
+	LevelDebug
+	LevelInfo
+	LevelWarn
+	LevelError
+	LevelFatal
 )
 
 func init() {
 	color.NoColor = false
 }
 
-// Index returns the severity of the level.
-func (l Level) Index() int {
+func (l Level) String() string {
 	switch l {
-	case levelTrace:
-		return 1
-	case levelDebug:
-		return 2
-	case levelInfo:
-		return 3
-	case levelWarn:
-		return 4
-	case levelError:
-		return 5
-	case levelFatal:
-		return 6
+	case LevelTrace:
+		return "trace"
+	case LevelDebug:
+		return "debug"
+	case LevelInfo:
+		return "info"
+	case LevelWarn:
+		return "warn"
+	case LevelError:
+		return "error"
+	case LevelFatal:
+		return "fatal"
 	default:
-		return 0
+		return ""
 	}
 }
 
@@ -50,5 +49,5 @@ var colors = []*color.Color{
 
 // color changes the color of a string to the color assigned to the level.
 func (l Level) color(str string) string {
-	return colors[l.Index()].Sprint(str)
+	return colors[l].Sprint(str)
 }
