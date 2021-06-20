@@ -30,7 +30,7 @@ import (
 type ConsoleTransporter struct {
 	Date     bool
 	Colors   bool
-	MinLevel string
+	MinLevel Level
 	Output   io.Writer
 
 	lastMsg int64
@@ -54,7 +54,7 @@ func (t *ConsoleTransporter) setLastMessage(l int64) {
 
 // Transport prints the log entry.
 func (t *ConsoleTransporter) Transport(level Level, msg string, date time.Time) {
-	if level.Index() < Level(t.MinLevel).Index() {
+	if level < t.MinLevel {
 		return
 	}
 
@@ -72,7 +72,7 @@ type FileTransporter struct {
 
 	Date     bool
 	Colors   bool
-	MinLevel string
+	MinLevel Level
 
 	RotateBytes int64
 	RotateLines int
@@ -99,10 +99,6 @@ type fileLogEntry struct {
 // Init opens the log file.
 // If rotation is enabled, the file size or the number of lines in the file is also counted, if necessary.
 func (t *FileTransporter) Init() error {
-	if t.MinLevel != "" && Level(t.MinLevel).Index() == 0 {
-		t.MinLevel = ""
-	}
-
 	var err error
 	t.file, err = os.OpenFile(t.Path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
@@ -212,7 +208,12 @@ func (t *FileTransporter) rotate() {
 	w := gzip.NewWriter(gz)
 	defer w.Close()
 
-	t.file.Seek(0, io.SeekStart)
+	_, err = t.file.Seek(0, io.SeekStart)
+	if err != nil {
+		t.showError(err)
+		return
+	}
+
 	_, err = io.Copy(w, t.file)
 	if err != nil {
 		t.showError(err)
@@ -276,7 +277,7 @@ func (t *FileTransporter) showError(err error) {
 	if !t.SuppressErrors {
 		log := ConsoleTransporter{Colors: true}
 		date := time.Now()
-		log.Transport(levelError, "Failed to write log file: "+err.Error(), date)
+		log.Transport(LevelError, "Failed to write log file: "+err.Error(), date)
 	}
 }
 
@@ -298,7 +299,7 @@ func (t *FileTransporter) setLastMessage(l int64) {
 
 // Transport writes the log entry to the file.
 func (t *FileTransporter) Transport(level Level, msg string, date time.Time) {
-	if t.closed || level.Index() < Level(t.MinLevel).Index() {
+	if t.closed || level < t.MinLevel {
 		return
 	}
 
@@ -329,7 +330,7 @@ type ServerTransporter struct {
 	URL    string
 	Secret string
 
-	MinLevel string
+	MinLevel Level
 
 	KeepColors     bool
 	SuppressErrors bool
@@ -342,7 +343,7 @@ type ServerTransporter struct {
 // serverLogEntry is used to serialize JSON.
 type serverLogEntry struct {
 	Type    string    `json:"type"`
-	Level   Level     `json:"level"`
+	Level   string    `json:"level"`
 	Date    time.Time `json:"date"`
 	Message string    `json:"message"`
 	Secret  string    `json:"secret,omitempty"`
@@ -359,9 +360,6 @@ func (t *ServerTransporter) Init() error {
 	}
 	if t.URL == "" {
 		return errors.New("empty url")
-	}
-	if t.MinLevel != "" && Level(t.MinLevel).Index() == 0 {
-		t.MinLevel = ""
 	}
 
 	t.closed = false
@@ -441,7 +439,7 @@ func (t *ServerTransporter) showError(err error) {
 	if !t.SuppressErrors && t.lastErrorShown+10*int64(time.Minute) < now() {
 		log := ConsoleTransporter{Colors: true}
 		date := time.Now()
-		log.Transport(levelError, "Failed to send log to server: "+err.Error(), date)
+		log.Transport(LevelError, "Failed to send log to server: "+err.Error(), date)
 
 		t.lastErrorShown = now()
 	}
@@ -449,7 +447,7 @@ func (t *ServerTransporter) showError(err error) {
 
 // Transport sends the log entry to the server.
 func (t *ServerTransporter) Transport(level Level, msg string, date time.Time) {
-	if t.closed || level.Index() < Level(t.MinLevel).Index() {
+	if t.closed || level < t.MinLevel {
 		return
 	}
 
@@ -459,7 +457,7 @@ func (t *ServerTransporter) Transport(level Level, msg string, date time.Time) {
 
 	e := serverLogEntry{
 		Type:    t.Type,
-		Level:   level,
+		Level:   level.String(),
 		Date:    date,
 		Message: msg,
 	}
