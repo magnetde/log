@@ -1,4 +1,4 @@
-package log
+package serverhook
 
 import (
 	"bytes"
@@ -16,30 +16,16 @@ import (
 )
 
 // BufSize is used as the channel size which buffers log entries before sending them asynchrously to the log server.
-// Set serverlog.BufSize = <value> _before_ calling NewServerHook
+// Set serverhook.BufSize = <value> _before_ calling NewServerHook
 // Once the buffer is full, logging will start blocking, waiting for slots to be available in the queue.
 var BufSize uint = 8192
 
-// Option is the parameter type for options when initializing the log hook.
-type Option int
-
-const (
-	// KeepColors - keep ANSII colors before sending them to the log server
-	KeepColors Option = iota
-
-	// SuppressErrors - suppress send errors
-	SuppressErrors
-
-	// Synchronous - send log entries synchronous to the server
-	Synchronous
-)
-
 // ServerHook to send logs to logcollect server.
 type ServerHook struct {
-	typ    string
-	url    string
-	secret string
+	typ string
+	url string
 
+	secret         string
 	keepColors     bool
 	suppressErrors bool
 
@@ -51,10 +37,11 @@ type ServerHook struct {
 	nextError time.Time
 }
 
+// Test if the ServerHook matches the logrus.Hook interface.
 var _ logrus.Hook = (*ServerHook)(nil)
 
 // NewServerHook creates a hook to be added to an instance of logger.
-func NewServerHook(typ, url, secret string, options ...Option) (*ServerHook, error) {
+func NewServerHook(typ, url string, options ...Option) (*ServerHook, error) {
 	if typ == "" {
 		return nil, errors.New("empty log type")
 	}
@@ -63,26 +50,12 @@ func NewServerHook(typ, url, secret string, options ...Option) (*ServerHook, err
 	}
 
 	h := &ServerHook{
-		typ:    typ,
-		url:    url,
-		secret: secret,
-
-		keepColors:     false,
-		suppressErrors: false,
-		synchronous:    false,
-
-		nextError: time.Time{},
+		typ: typ,
+		url: url,
 	}
 
 	for _, o := range options {
-		switch o {
-		case KeepColors:
-			h.keepColors = true
-		case SuppressErrors:
-			h.suppressErrors = true
-		case Synchronous:
-			h.synchronous = true
-		}
+		o.apply(h)
 	}
 
 	if !h.synchronous {
@@ -149,6 +122,19 @@ func (h *ServerHook) worker() {
 		h.sendEntry(entry)
 		h.wg.Done()
 	}
+}
+
+// serverLogEntry is used to serialize JSON.
+type serverLogEntry struct {
+	Type    string    `json:"type"`
+	Level   Level     `json:"level"`
+	Date    time.Time `json:"date"`
+	Message string    `json:"message"`
+	Secret  string    `json:"secret,omitempty"`
+}
+
+type logError struct {
+	Err string `json:"error"`
 }
 
 func (h *ServerHook) sendEntry(entry *logrus.Entry) {
@@ -248,7 +234,7 @@ func (h *ServerHook) createServerEntry(entry *logrus.Entry) *serverLogEntry {
 
 	e := &serverLogEntry{
 		Type:    h.typ,
-		Level:   lvl.String(),
+		Level:   lvl,
 		Date:    entry.Time,
 		Message: msg,
 		Secret:  h.secret,
@@ -285,16 +271,5 @@ func appendKeyValue(b *strings.Builder, key string, value interface{}) {
 		stringVal = fmt.Sprint(value)
 	}
 
-	// quote string if needed
-	for _, ch := range stringVal {
-		if !((ch >= 'a' && ch <= 'z') ||
-			(ch >= 'A' && ch <= 'Z') ||
-			(ch >= '0' && ch <= '9') ||
-			ch == '-' || ch == '.' || ch == '_' || ch == '/' || ch == '@' || ch == '^' || ch == '+') {
-			stringVal = fmt.Sprintf("%q", stringVal)
-			break
-		}
-	}
-
-	b.WriteString(stringVal)
+	b.WriteString(quoteIfNeeded(stringVal))
 }
