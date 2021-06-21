@@ -1,6 +1,11 @@
-package log
+package serverhook
 
-import "github.com/fatih/color"
+import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/fatih/color"
+)
 
 // Level is the internal log level.
 type Level int
@@ -50,4 +55,35 @@ var colors = []*color.Color{
 // color changes the color of a string to the color assigned to the level.
 func (l Level) color(str string) string {
 	return colors[l].Sprint(str)
+}
+
+func (l Level) MarshalJSON() ([]byte, error) {
+	return json.Marshal(l.String())
+}
+
+func (l *Level) UnmarshalJSON(b []byte) error {
+	var s string
+	err := json.Unmarshal(b, &s)
+	if err != nil {
+		return err
+	}
+
+	switch s {
+	case "trace":
+		*l = LevelTrace
+	case "debug":
+		*l = LevelDebug
+	case "info":
+		*l = LevelInfo
+	case "warn":
+		*l = LevelWarn
+	case "error":
+		*l = LevelError
+	case "fatal":
+		*l = LevelFatal
+	default:
+		return fmt.Errorf(`unknown level string "%s"`, s)
+	}
+
+	return nil
 }

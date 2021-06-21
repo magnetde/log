@@ -1,25 +1,12 @@
 This repository is a mirror of a private GitLab instance. All changes will be overwritten.
 
-# golog
+# serverhook
 
-_golog_ is a simple package for logging.
+Serverhook is a hook for [logrus](https://github.com/sirupsen/logrus) to send log entries to a private log server.
 
 ```bash
-go get -u github.com/magnetde/log
+go get -u github.com/magnetde/serverhook
 ```
-
-The following types of outputs (_transports_) are so far possible:
-
-## 1. Console
-
-The log entry is printed to stdout. It is also possible to create a colored output or concat the date to the log entry.
-
-## 2. File
-
-Analogous to the console, log entries can be written to a file.
-Log files can be rotated by compressing the current log file and adding a sequential suffix (e.g. _example.log.1.gz_).
-
-## 3. Log server
 
 JSON packets are sent to an URL via HTTP POST calls. Packets have the following format:
 
@@ -32,46 +19,32 @@ JSON packets are sent to an URL via HTTP POST calls. Packets have the following 
 }
 ```
 
-HTTP calls are executed in a separate go routine, so calls to log functions do not block until the packet is sent.
+## Available Options
 
-Thereby, the correct order is guaranteed.
+- `serverlog.WithSecret("...")`: secret required by the server
+- `serverlog.KeepColors(true)`: keep or strip ANSI colors from the log message
+- `serverlog.SuppressErrors(true)`: suppress errors when sending to the server failed
+- `serverlog.Synchronous(true)`: log entries are sent synchronously to the server
 
 ## Example
 
-```golang
+Entries can be sent synchronously or asynchronously.
+
+```go
 package main
 
-import "github.com/magnetde/log"
+import (
+	log "github.com/sirupsen/logrus"
+	"github.com/magnetde/serverhook"
+)
 
 func main() {
-	log.Init(
-		&log.ConsoleTransporter{
-			Date:   true,
-			Colors: true,
-		},
-		&log.FileTransporter{
-			Path:        "/var/log/test.log",
-			Date:        true,
-			RotateLines: 50_000, // Rotate after 50,000 lines
-			Rotations:   12,     // Keep 12 rotations
-		},
-		&log.ServerTransporter{
-			Type:     "example",
-			URL:      "http://localhost/log",
-			Secret:   "logging",
-			MinLevel: "info",
-		},
-	)
+	hook, err := serverlog.NewServerHook("example", "https://example.org/log", serverlog.WithSecret("example"))
+	if err != nil {
+		// ...
+	}
 
-	log.Info("Example info")
-	log.Error("Example error")
-	log.Close()
+	defer hook.Flush()
+	log.AddHook(hook)
 }
-```
-
-Example output:
-
-```txt
- [info] [2021-02-2216:21:56+01:00] Example info
-[error] [2021-02-2216:21:56+01:00] Example error 0.2 ms
 ```
