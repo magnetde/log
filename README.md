@@ -19,13 +19,6 @@ JSON packets are sent to an URL via HTTP POST calls. Packets have the following 
 }
 ```
 
-## Available Options
-
-- `serverhook.WithSecret("...")`: secret required by the server
-- `serverhook.KeepColors(true)`: keep or strip ANSI colors from the log message
-- `serverhook.SuppressErrors(true)`: suppress errors when sending to the server failed
-- `serverhook.Synchronous(true)`: log entries are sent synchronously to the server
-
 ## Example
 
 Entries can be sent synchronously or asynchronously.
@@ -48,3 +41,10 @@ func main() {
 	log.AddHook(hook)
 }
 ```
+
+## Available Options
+
+- `serverhook.WithSecret("...")`: secret required by the server
+- `serverhook.KeepColors(true)`: keep or strip ANSI colors from the log message
+- `serverhook.SuppressErrors(true)`: suppress errors when sending to the server failed
+- `serverhook.Synchronous(true)`: log entries are sent synchronously to the server
