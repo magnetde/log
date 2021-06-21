@@ -16,7 +16,7 @@ import (
 )
 
 // BufSize is used as the channel size which buffers log entries before sending them asynchrously to the log server.
-// Set serverlog.BufSize = <value> _before_ calling NewServerHook
+// Set serverhook.BufSize = <value> _before_ calling NewServerHook
 // Once the buffer is full, logging will start blocking, waiting for slots to be available in the queue.
 var BufSize uint = 8192
 

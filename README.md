@@ -21,10 +21,10 @@ JSON packets are sent to an URL via HTTP POST calls. Packets have the following 
 
 ## Available Options
 
-- `serverlog.WithSecret("...")`: secret required by the server
-- `serverlog.KeepColors(true)`: keep or strip ANSI colors from the log message
-- `serverlog.SuppressErrors(true)`: suppress errors when sending to the server failed
-- `serverlog.Synchronous(true)`: log entries are sent synchronously to the server
+- `serverhook.WithSecret("...")`: secret required by the server
+- `serverhook.KeepColors(true)`: keep or strip ANSI colors from the log message
+- `serverhook.SuppressErrors(true)`: suppress errors when sending to the server failed
+- `serverhook.Synchronous(true)`: log entries are sent synchronously to the server
 
 ## Example
 
@@ -39,7 +39,7 @@ import (
 )
 
 func main() {
-	hook, err := serverlog.NewServerHook("example", "https://example.org/log", serverlog.WithSecret("example"))
+	hook, err := serverhook.NewServerHook("example", "https://example.org/log", serverhook.WithSecret("example"))
 	if err != nil {
 		// ...
 	}
