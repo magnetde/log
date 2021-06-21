@@ -1,4 +1,4 @@
-module github.com/magnetde/log
+module github.com/magnetde/serverhook
 
 go 1.15
 
