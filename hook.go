@@ -207,7 +207,9 @@ func (h *ServerHook) showError(err error) {
 func (h *ServerHook) createServerEntry(entry *logrus.Entry) *serverLogEntry {
 	var lvl Level
 	switch entry.Level {
-	case logrus.PanicLevel, logrus.FatalLevel:
+	case logrus.PanicLevel:
+		lvl = LevelPanic
+	case logrus.FatalLevel:
 		lvl = LevelFatal
 	case logrus.ErrorLevel:
 		lvl = LevelError
