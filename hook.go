@@ -243,7 +243,7 @@ func (h *ServerHook) createServerEntry(entry *logrus.Entry) *serverLogEntry {
 				stringval = fmt.Sprint(s)
 			}
 
-			f[k] = quoteIfNeeded(stringval)
+			f[k] = stringval
 		}
 
 		e.Data = f
