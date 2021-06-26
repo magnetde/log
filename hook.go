@@ -124,13 +124,25 @@ func (h *ServerHook) worker() {
 	}
 }
 
+type logFields map[string]interface{}
+
 // serverLogEntry is used to serialize JSON.
 type serverLogEntry struct {
-	Type    string    `json:"type"`
-	Level   Level     `json:"level"`
-	Date    time.Time `json:"date"`
-	Message string    `json:"message"`
-	Secret  string    `json:"secret,omitempty"`
+	Type    string       `json:"type"`
+	Level   logrus.Level `json:"level"`
+	Time    time.Time    `json:"time"`
+	Message string       `json:"message"`
+
+	Caller *caller   `json:"caller,omitempty"`
+	Data   logFields `json:"data,omitempty"`
+
+	Secret string `json:"secret,omitempty"`
+}
+
+type caller struct {
+	File     string `json:"file"`
+	Line     int    `json:"line"`
+	Function string `json:"function"`
 }
 
 type logError struct {
@@ -205,24 +217,6 @@ func (h *ServerHook) showError(err error) {
 
 // createServerEntry creates a log entry which can be send to the log server from a logrus entry.
 func (h *ServerHook) createServerEntry(entry *logrus.Entry) *serverLogEntry {
-	var lvl Level
-	switch entry.Level {
-	case logrus.PanicLevel, logrus.FatalLevel:
-		lvl = LevelFatal
-	case logrus.ErrorLevel:
-		lvl = LevelError
-	case logrus.WarnLevel:
-		lvl = LevelWarn
-	case logrus.InfoLevel:
-		lvl = LevelInfo
-	case logrus.DebugLevel:
-		lvl = LevelDebug
-	case logrus.TraceLevel:
-		lvl = LevelTrace
-	default: // should never happen
-		break
-	}
-
 	var b strings.Builder
 	b.WriteString(entry.Message)
 	appendData(&b, entry.Data)
@@ -234,10 +228,29 @@ func (h *ServerHook) createServerEntry(entry *logrus.Entry) *serverLogEntry {
 
 	e := &serverLogEntry{
 		Type:    h.typ,
-		Level:   lvl,
-		Date:    entry.Time,
+		Level:   entry.Level,
+		Time:    entry.Time,
 		Message: msg,
 		Secret:  h.secret,
+	}
+
+	d := entry.Data
+	if len(d) > 0 {
+		f := make(logFields, len(d))
+		for k, v := range d {
+			f[k] = v
+		}
+
+		e.Data = f
+	}
+
+	c := entry.Caller
+	if c != nil {
+		e.Caller = &caller{
+			File:     c.File,
+			Line:     c.Line,
+			Function: c.Function,
+		}
 	}
 
 	return e

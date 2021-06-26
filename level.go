@@ -3,8 +3,6 @@ package serverhook
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/fatih/color"
 )
 
 // Level is the internal log level.
@@ -17,11 +15,8 @@ const (
 	LevelWarn
 	LevelError
 	LevelFatal
+	LevelPanic
 )
-
-func init() {
-	color.NoColor = false
-}
 
 func (l Level) String() string {
 	switch l {
@@ -37,24 +32,11 @@ func (l Level) String() string {
 		return "error"
 	case LevelFatal:
 		return "fatal"
+	case LevelPanic:
+		return "panic"
 	default:
 		return ""
 	}
-}
-
-var colors = []*color.Color{
-	color.New(),
-	color.New(color.FgBlue),
-	color.New(color.FgCyan),
-	color.New(color.FgGreen),
-	color.New(color.FgYellow),
-	color.New(color.FgRed),
-	color.New(color.FgRed, color.Bold),
-}
-
-// color changes the color of a string to the color assigned to the level.
-func (l Level) color(str string) string {
-	return colors[l].Sprint(str)
 }
 
 func (l Level) MarshalJSON() ([]byte, error) {
@@ -81,6 +63,8 @@ func (l *Level) UnmarshalJSON(b []byte) error {
 		*l = LevelError
 	case "fatal":
 		*l = LevelFatal
+	case "panic":
+		*l = LevelPanic
 	default:
 		return fmt.Errorf(`unknown level string "%s"`, s)
 	}
