@@ -131,9 +131,17 @@ type serverLogEntry struct {
 	Level   logrus.Level `json:"level"`
 	Time    time.Time    `json:"time"`
 	Message string       `json:"message"`
-	Data    logFields    `json:"data,omitempty"`
+
+	Caller *caller   `json:"caller,omitempty"`
+	Data   logFields `json:"data,omitempty"`
 
 	Secret string `json:"secret,omitempty"`
+}
+
+type caller struct {
+	File     string `json:"file"`
+	Line     int    `json:"line"`
+	Function string `json:"function"`
 }
 
 type logError struct {
@@ -239,6 +247,15 @@ func (h *ServerHook) createServerEntry(entry *logrus.Entry) *serverLogEntry {
 		}
 
 		e.Data = f
+	}
+
+	c := entry.Caller
+	if c != nil {
+		e.Caller = &caller{
+			File:     c.File,
+			Line:     c.Line,
+			Function: c.Function,
+		}
 	}
 
 	return e
