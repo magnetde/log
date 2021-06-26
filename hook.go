@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -124,7 +123,7 @@ func (h *ServerHook) worker() {
 	}
 }
 
-type logFields map[string]interface{}
+type logFields map[string]string
 
 // serverLogEntry is used to serialize JSON.
 type serverLogEntry struct {
@@ -219,7 +218,6 @@ func (h *ServerHook) showError(err error) {
 func (h *ServerHook) createServerEntry(entry *logrus.Entry) *serverLogEntry {
 	var b strings.Builder
 	b.WriteString(entry.Message)
-	appendData(&b, entry.Data)
 
 	msg := b.String()
 	if !h.keepColors {
@@ -238,7 +236,14 @@ func (h *ServerHook) createServerEntry(entry *logrus.Entry) *serverLogEntry {
 	if len(d) > 0 {
 		f := make(logFields, len(d))
 		for k, v := range d {
-			f[k] = v
+			var stringval string
+			if s, ok := v.(string); ok {
+				stringval = s
+			} else {
+				stringval = fmt.Sprint(s)
+			}
+
+			f[k] = quoteIfNeeded(stringval)
 		}
 
 		e.Data = f
@@ -254,35 +259,4 @@ func (h *ServerHook) createServerEntry(entry *logrus.Entry) *serverLogEntry {
 	}
 
 	return e
-}
-
-// appendData appends the data to the log message.
-func appendData(b *strings.Builder, data logrus.Fields) {
-	keys := make([]string, 0, len(data))
-
-	for k := range data {
-		keys = append(keys, k)
-	}
-
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		if v, ok := data[k]; ok {
-			b.WriteRune(' ')
-			appendKeyValue(b, k, v)
-		}
-	}
-}
-
-// appendKeyValue appends the key and the value to the log message.
-func appendKeyValue(b *strings.Builder, key string, value interface{}) {
-	b.WriteString(key)
-	b.WriteByte('=')
-
-	stringVal, ok := value.(string)
-	if !ok {
-		stringVal = fmt.Sprint(value)
-	}
-
-	b.WriteString(quoteIfNeeded(stringVal))
 }
