@@ -1,7 +1,6 @@
 package serverhook
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 )
@@ -16,20 +15,6 @@ var colorRegex = regexp.MustCompile(strings.Join(colorParts, "|"))
 func removeColors(s string) string {
 	if colorRegex.MatchString(s) {
 		return colorRegex.ReplaceAllString(s, "")
-	}
-
-	return s
-}
-
-// quoteIfNeeded adds quotation marks to the string if needed.
-func quoteIfNeeded(s string) string {
-	for _, ch := range s {
-		if !((ch >= 'a' && ch <= 'z') ||
-			(ch >= 'A' && ch <= 'Z') ||
-			(ch >= '0' && ch <= '9') ||
-			ch == '-' || ch == '.' || ch == '_' || ch == '/' || ch == '@' || ch == '^' || ch == '+') {
-			return fmt.Sprintf("%q", s)
-		}
 	}
 
 	return s
