@@ -71,6 +71,10 @@ func (h *ServerHook) Fire(entry *logrus.Entry) error {
 	h.mu.RLock() // Claim the mutex as a RLock - allowing multiple go routines to log simultaneously
 	defer h.mu.RUnlock()
 
+	if h.synchronous {
+		return h.sendEntry(entry)
+	}
+
 	// Creating a new entry to prevent data races
 	newData := make(map[string]interface{})
 	for k, v := range entry.Data {
@@ -86,12 +90,8 @@ func (h *ServerHook) Fire(entry *logrus.Entry) error {
 		Message: entry.Message,
 	}
 
-	if h.synchronous {
-		h.sendEntry(newEntry)
-	} else {
-		h.wg.Add(1)
-		h.buf <- newEntry
-	}
+	h.wg.Add(1)
+	h.buf <- newEntry
 
 	if entry.Level == logrus.PanicLevel || entry.Level == logrus.FatalLevel {
 		h.wg.Wait()
@@ -118,12 +118,19 @@ func (h *ServerHook) Levels() []logrus.Level {
 func (h *ServerHook) worker() {
 	for {
 		entry := <-h.buf // receive new entry on channel
-		h.sendEntry(entry)
+
+		err := h.sendEntry(entry)
+		if err != nil {
+			if !h.suppressErrors && h.nextError.Before(time.Now()) {
+				logrus.Error("Failed to send log to server: " + err.Error())
+
+				h.nextError = time.Now().Add(10 * time.Minute)
+			}
+		}
+
 		h.wg.Done()
 	}
 }
-
-type logFields map[string]string
 
 // serverLogEntry is used to serialize JSON.
 type serverLogEntry struct {
@@ -132,8 +139,8 @@ type serverLogEntry struct {
 	Time    time.Time    `json:"time"`
 	Message string       `json:"message"`
 
-	Caller *caller   `json:"caller,omitempty"`
-	Data   logFields `json:"data,omitempty"`
+	Caller *caller           `json:"caller,omitempty"`
+	Data   map[string]string `json:"data,omitempty"`
 
 	Secret string `json:"secret,omitempty"`
 }
@@ -148,21 +155,19 @@ type logError struct {
 	Err string `json:"error"`
 }
 
-func (h *ServerHook) sendEntry(entry *logrus.Entry) {
+func (h *ServerHook) sendEntry(entry *logrus.Entry) error {
 	e := h.createServerEntry(entry)
 
 	jsonData, err := json.Marshal(e)
 	if err != nil {
-		h.showError(err)
-		return
+		return err
 	}
 
 	r := bytes.NewReader(jsonData)
 
 	req, err := http.NewRequest(http.MethodPost, h.url, r)
 	if err != nil {
-		h.showError(err)
-		return
+		return err
 	}
 
 	req.Header.Set("accept", "application/json")
@@ -174,8 +179,7 @@ func (h *ServerHook) sendEntry(entry *logrus.Entry) {
 
 	res, err := client.Do(req)
 	if err != nil {
-		h.showError(err)
-		return
+		return err
 	}
 
 	if res.Body != nil {
@@ -183,35 +187,25 @@ func (h *ServerHook) sendEntry(entry *logrus.Entry) {
 	}
 
 	if res.StatusCode < 400 {
-		return
+		return nil
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		h.showError(err)
-		return
+		return err
 	}
 
 	var logErr logError
 	err = json.Unmarshal(body, &logErr)
 	if err != nil {
-		h.showError(err)
-		return
+		return err
 	}
 
 	if logErr.Err != "" {
-		h.showError(errors.New(logErr.Err))
-		return
+		return errors.New(logErr.Err)
 	}
-}
 
-// showError prints an error to the console.
-func (h *ServerHook) showError(err error) {
-	if !h.suppressErrors && h.nextError.Before(time.Now()) {
-		logrus.Error("Failed to send log to server: " + err.Error())
-
-		h.nextError = time.Now().Add(10 * time.Minute)
-	}
+	return fmt.Errorf("status %d returned", res.StatusCode)
 }
 
 // createServerEntry creates a log entry which can be send to the log server from a logrus entry.
@@ -234,7 +228,7 @@ func (h *ServerHook) createServerEntry(entry *logrus.Entry) *serverLogEntry {
 
 	d := entry.Data
 	if len(d) > 0 {
-		f := make(logFields, len(d))
+		f := make(map[string]string, len(d))
 		for k, v := range d {
 			var stringval string
 			if s, ok := v.(string); ok {
